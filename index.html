@@ -156,8 +156,8 @@
   .cart-item-price{font-size:11.5px;font-weight:800;color:var(--maroon);white-space:nowrap;}
   .cart-item-remove{color:var(--danger);padding:4px;}
 
-  .cart-footer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--sand);
-    padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(59,36,23,0.08);}
+  .cart-footer{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--sand);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(59,36,23,0.08);z-index:45;border-top:1px solid var(--border);}
 
   /* ===== Bottom nav ===== */
   .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:64px;background:var(--card);
@@ -552,6 +552,7 @@ function listenToStockLevels(){
 }
 
 function getStock(code){ return stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999; }
+function inStockOnly(list){ return list.filter(p => getStock(p.code) > 0); }
 
 function listenToMyOrders(){
     if (!customerPhone) return;
@@ -606,7 +607,7 @@ function renderHome(){
             </button>`).join('');
     }
     const bestRow = document.getElementById('bestSellersRow');
-    const best = products.slice(0, 8);
+    const best = inStockOnly(products).slice(0, 8);
     bestRow.innerHTML = best.length ? best.map(p => productCardHtml(p)).join('') : `<div class="empty-note">لسه مفيش أصناف مضافة</div>`;
 }
 
@@ -670,7 +671,7 @@ function openCategoryProducts(brandName){
 }
 function renderCategoryProducts(){
     const cat = appCategories.find(c => c.id === activeCatId);
-    let list = products.filter(p => p.category === cat?.name && (!activeBrandName || p.brand === activeBrandName));
+    let list = inStockOnly(products.filter(p => p.category === cat?.name && (!activeBrandName || p.brand === activeBrandName)));
     const sort = document.getElementById('sortSelect').value;
     if (sort === 'priceAsc') list = [...list].sort((a,b)=>a.price-b.price);
     else if (sort === 'priceDesc') list = [...list].sort((a,b)=>b.price-a.price);
@@ -685,7 +686,7 @@ function renderSearchResults(){
     const q = document.getElementById('searchInput').value.trim();
     const grid = document.getElementById('searchResultsGrid');
     if (!q){ grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1;">اكتب اسم الصنف أو الشركة عشان تبدأ البحث</div>`; return; }
-    const results = products.filter(p => p.name.includes(q) || (p.brand||'').includes(q));
+    const results = inStockOnly(products.filter(p => p.name.includes(q) || (p.brand||'').includes(q)));
     grid.innerHTML = results.length ? results.map(p => productCardHtml(p)).join('') : `<div class="empty-note" style="grid-column:1/-1;">مفيش نتائج مطابقة لـ "${q}"</div>`;
 }
 function toggleFavorite(code){
@@ -699,7 +700,7 @@ function toggleFavorite(code){
 }
 function renderFavorites(){
     const grid = document.getElementById('favoritesGrid');
-    const list = products.filter(p => favorites.includes(p.code));
+    const list = inStockOnly(products.filter(p => favorites.includes(p.code)));
     grid.innerHTML = list.length ? list.map(p => productCardHtml(p)).join('')
         : `<div class="empty-note" style="grid-column:1/-1;">مفيش أصناف في المفضلة لسه<br>دوس على النجمة فوق أي صنف عشان تضيفه هنا</div>`;
 }
