@@ -31,9 +31,7 @@
 
   /* ===== Login ===== */
   #loginScreen{align-items:center;justify-content:center;text-align:center;padding:32px 24px;min-height:100vh;}
-  .logo-badge{width:84px;height:84px;border-radius:22px;background:linear-gradient(150deg,var(--maroon),var(--maroon-dark));
-    display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:var(--gold);
-    box-shadow:0 8px 24px rgba(122,31,31,0.25);margin-bottom:18px;}
+  .login-logo{width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 8px 24px rgba(122,31,31,0.25);margin-bottom:18px;}
   .login-input{width:100%;padding:15px 16px;border-radius:16px;border:1px solid var(--border);background:var(--card);
     font-size:15px;font-weight:700;text-align:center;direction:ltr;margin-bottom:14px;}
   .btn-primary{width:100%;padding:15px;border-radius:16px;background:linear-gradient(150deg,var(--maroon),var(--maroon-dark));
@@ -216,7 +214,7 @@
 
 <!-- ============== LOGIN ============== -->
 <div id="loginScreen" class="screen active">
-  <div class="logo-badge">م</div>
+  <img src="icon-512.png" class="login-logo" alt="المعلم">
   <div style="font-size:18px;font-weight:900;margin-bottom:4px;">أهلاً بيك في المعلم</div>
   <div style="font-size:11.5px;color:var(--muted);margin-bottom:22px;">سجّل برقم موبايلك وابدأ تصفح الكتالوج فورًا</div>
   <input type="tel" id="loginPhone" class="login-input" placeholder="01xxxxxxxxx" style="direction:ltr;" maxlength="11">
