@@ -1,32 +1,31 @@
 const CACHE_NAME = 'almoallem-app-v2';
 const CORE_ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', function(event) {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
+        caches.open(CACHE_NAME).then(function(cache) { return cache.addAll(CORE_ASSETS); })
     );
     self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', function(event) {
     event.waitUntil(
-        caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+        caches.keys().then(function(keys) {
+            return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME; }).map(function(k) { return caches.delete(k); }));
+        })
     );
     self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-    const url = new URL(event.request.url);
-    if (CORE_ASSETS.some((a) => url.pathname.endsWith(a.replace('./', '')))) {
+self.addEventListener('fetch', function(event) {
+    var url = new URL(event.request.url);
+    if (CORE_ASSETS.some(function(a) { return url.pathname.endsWith(a.replace('./', '')); })) {
         event.respondWith(
-            caches.match(event.request).then((cached) => cached || fetch(event.request))
+            caches.match(event.request).then(function(cached) { return cached || fetch(event.request); })
         );
     }
 });
 
-/* =========================================================================
-   إشعارات Firebase (Background)
-   ========================================================================= */
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
@@ -40,8 +39,8 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
-    const n = payload.notification || {};
+messaging.onBackgroundMessage(function(payload) {
+    var n = payload.notification || {};
     self.registration.showNotification(n.title || 'المعلم', {
         body: n.body || '',
         icon: n.icon || './icon-192.png',
@@ -51,12 +50,13 @@ messaging.onBackgroundMessage((payload) => {
     });
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function(event) {
     event.notification.close();
-    const url = event.notification.data?.url || './';
+    var url = event.notification.data && event.notification.data.url ? event.notification.data.url : './';
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            for (let client of windowClients) {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            for (var i = 0; i < windowClients.length; i++) {
+                var client = windowClients[i];
                 if (client.url === url && 'focus' in client) return client.focus();
             }
             if (clients.openWindow) return clients.openWindow(url);
