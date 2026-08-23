@@ -13,6 +13,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- ====== إضافة: Firebase Messaging SDK ====== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <style>
   :root{
     --maroon:#7A1F1F; --maroon-dark:#5E1414; --gold:#D4A017; --cream:#FBF3E7;
@@ -29,7 +31,6 @@
   .screen.active{display:flex;}
   .hidden{display:none !important;}
 
-  /* ===== Login ===== */
   #loginScreen{align-items:center;justify-content:center;text-align:center;padding:32px 24px;min-height:100vh;}
   .login-logo{width:120px;height:120px;border-radius:50%;object-fit:cover;box-shadow:0 8px 24px rgba(122,31,31,0.25);margin-bottom:18px;}
   .login-input{width:100%;padding:15px 16px;border-radius:16px;border:1px solid var(--border);background:var(--card);
@@ -38,12 +39,10 @@
     color:var(--cream);font-weight:800;font-size:14px;}
   .btn-primary:disabled{opacity:0.4;}
 
-  /* ===== Top tabs ===== */
   .top-tabs{display:flex;gap:6px;margin:12px 16px 8px;padding:4px;border-radius:16px;background:var(--sand);}
   .top-tab{flex:1;padding:10px;border-radius:12px;font-size:12px;font-weight:800;color:var(--muted);}
   .top-tab.active{background:linear-gradient(150deg,var(--maroon),var(--maroon-dark));color:var(--cream);box-shadow:0 2px 8px rgba(107,20,20,0.3);}
 
-  /* ===== Welcome card ===== */
   .welcome-card{margin:0 16px;border-radius:20px;padding:14px;background:linear-gradient(135deg,#8B2424,#5E1414);position:relative;overflow:hidden;}
   .welcome-card::before{content:'';position:absolute;left:-24px;top:-30px;width:110px;height:110px;border-radius:50%;background:rgba(212,160,23,0.15);}
   .welcome-row{position:relative;display:flex;align-items:center;gap:10px;}
@@ -51,17 +50,14 @@
   .welcome-name{font-size:13px;font-weight:800;color:var(--cream);}
   .welcome-sub{font-size:10px;color:#E3B9B0;}
 
-  /* ===== Search ===== */
   .search-bar{margin:12px 16px 0;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);
     border-radius:16px;padding:12px 14px;}
   .search-bar input{border:none;background:none;flex:1;font-size:12px;font-weight:600;color:var(--ink);outline:none;}
 
-  /* ===== Section headers ===== */
   .section-head{display:flex;align-items:center;gap:8px;margin:20px 16px 12px;}
   .section-bar{width:4px;height:16px;border-radius:2px;background:var(--maroon);}
   .section-title{font-size:13px;font-weight:800;}
 
-  /* ===== Ad banner ===== */
   .ad-banner{margin:14px 16px 0;border-radius:18px;padding:16px;height:88px;display:flex;flex-direction:column;justify-content:center;
     position:relative;overflow:hidden;color:var(--cream);}
   .ad-banner::before{content:'';position:absolute;left:-16px;bottom:-24px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.15);}
@@ -71,7 +67,6 @@
   .ad-dot{width:5px;height:5px;border-radius:50%;background:var(--border);}
   .ad-dot.active{width:14px;background:var(--maroon);}
 
-  /* ===== Grids ===== */
   .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px;}
   .cat-tile{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;flex-direction:column;
     align-items:center;gap:6px;box-shadow:0 1px 4px rgba(59,36,23,0.04);}
@@ -93,7 +88,6 @@
   .prod-row::-webkit-scrollbar{display:none;}
   .prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px;}
 
-  /* ===== Product card ===== */
   .pcard{background:var(--card);border:1px solid var(--border);border-radius:22px;overflow:hidden;box-shadow:0 1px 4px rgba(59,36,23,0.05);
     position:relative;flex-shrink:0;width:100%;}
   .prod-row .pcard{width:140px;}
@@ -123,7 +117,6 @@
   .pcard-unit-btn{flex:1;font-size:9px;font-weight:800;padding:5px;border-radius:8px;border:1px solid var(--border);color:var(--maroon);}
   .pcard-unit-btn.active{background:var(--sand);}
 
-  /* ===== Buttons/pills ===== */
   .pill-row{display:flex;gap:6px;margin:0 16px 8px;overflow-x:auto;padding-bottom:2px;}
   .pill-row::-webkit-scrollbar{display:none;}
   .pill{flex-shrink:0;padding:7px 14px;border-radius:99px;font-size:10.5px;font-weight:800;background:var(--sand);color:#5B4432;white-space:nowrap;}
@@ -134,7 +127,6 @@
   .row-2{display:flex;gap:10px;margin:14px 16px 0;}
   .row-2 > *{flex:1;}
 
-  /* ===== Header w/ back ===== */
   .header-row{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;}
   .back-btn{width:32px;height:32px;border-radius:50%;background:var(--sand);color:var(--maroon);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .header-title{font-size:13px;font-weight:800;}
@@ -142,7 +134,6 @@
   .header-dark .header-title{color:var(--cream);}
   .header-dark .back-btn{background:rgba(255,255,255,0.15);color:var(--cream);}
 
-  /* ===== Cart ===== */
   .cart-item{margin:0 16px 10px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:10px;display:flex;gap:10px;align-items:center;}
   .cart-item img,.cart-item .fallback{width:60px;height:60px;border-radius:14px;object-fit:cover;flex-shrink:0;}
   .cart-item .fallback{display:flex;align-items:center;justify-content:center;background:var(--sand);color:var(--maroon);font-size:20px;}
@@ -157,7 +148,6 @@
   .cart-footer{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--sand);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(59,36,23,0.08);z-index:45;border-top:1px solid var(--border);}
 
-  /* ===== Bottom nav ===== */
   .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:64px;background:var(--card);
     border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;
     padding-bottom:env(safe-area-inset-bottom);z-index:40;}
@@ -168,7 +158,6 @@
   .nav-badge{position:absolute;top:2px;left:8px;background:var(--gold);color:var(--ink);border-radius:50%;
     width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;}
 
-  /* ===== Forms ===== */
   .form-group{margin:0 16px 14px;}
   .form-label{font-size:11px;font-weight:800;margin-bottom:6px;display:block;color:#5B4432;}
   .form-input,.form-textarea,.form-select{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--border);
@@ -178,7 +167,6 @@
     background:var(--sand);color:var(--maroon);}
   .map-btn.pinned{background:#E9F5EC;color:var(--success);}
 
-  /* ===== Order card ===== */
   .order-card{margin:0 16px 12px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px;}
   .order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
   .order-id{font-size:12px;font-weight:800;}
@@ -189,13 +177,11 @@
   .status-fulfilled{background:#DDF0E1;color:var(--success);}
   .status-rejected{background:#FBE3C9;color:var(--danger);}
 
-  /* ===== Toast ===== */
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);
     padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100;opacity:0;transition:opacity 0.25s;
     max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
 
-  /* ===== Modal ===== */
   .modal-overlay{position:fixed;inset:0;background:rgba(36,21,18,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
   .modal-overlay.show{display:flex;}
   .modal-sheet{width:100%;max-width:480px;background:var(--cream);border-radius:24px 24px 0 0;padding:20px;max-height:85vh;overflow-y:auto;}
@@ -229,7 +215,6 @@
 </head>
 <body>
 
-<!-- ============== SPLASH ============== -->
 <div id="splashScreen" class="splash-screen">
   <img src="icon-512.png" class="splash-logo" alt="المعلم">
   <div class="splash-name">المعلم</div>
@@ -242,7 +227,6 @@
   <div class="splash-dots"><div class="splash-dot"></div><div class="splash-dot"></div><div class="splash-dot"></div></div>
 </div>
 
-<!-- ============== LOGIN ============== -->
 <div id="loginScreen" class="screen">
   <img src="icon-512.png" class="login-logo" alt="المعلم">
   <div style="font-size:18px;font-weight:900;margin-bottom:4px;">أهلاً بيك في المعلم</div>
@@ -252,7 +236,6 @@
   <div style="font-size:9.5px;color:#B7935F;margin-top:12px;">هنطلب باقي بياناتك بس عند أول طلب</div>
 </div>
 
-<!-- ============== MAIN APP ============== -->
 <div id="appRoot" class="hidden">
   <div class="top-tabs">
     <button class="top-tab" data-toptab="orders" onclick="switchTopTab('orders')">طلباتي</button>
@@ -260,7 +243,6 @@
     <button class="top-tab active" data-toptab="home" onclick="switchTopTab('home')">الرئيسية</button>
   </div>
 
-  <!-- HOME -->
   <div id="homeScreen" class="screen active">
     <div class="welcome-card">
       <div class="welcome-row">
@@ -295,7 +277,6 @@
     <div id="bestSellersRow" class="prod-row"></div>
   </div>
 
-  <!-- BRANDS -->
   <div id="brandsScreen" class="screen">
     <div class="header-row">
       <button class="back-btn" onclick="switchScreen('home')"><i class="fas fa-arrow-right"></i></button>
@@ -304,7 +285,6 @@
     <div id="brandsGrid" class="brand-grid"></div>
   </div>
 
-  <!-- CATEGORY PRODUCTS -->
   <div id="categoryScreen" class="screen">
     <div class="header-row">
       <button class="back-btn" onclick="switchScreen('brands')"><i class="fas fa-arrow-right"></i></button>
@@ -321,7 +301,6 @@
     <div id="categoryProductsGrid" class="prod-grid" style="padding-bottom:20px;"></div>
   </div>
 
-  <!-- SEARCH -->
   <div id="searchScreen" class="screen">
     <div class="header-row">
       <button class="back-btn" onclick="switchScreen('home')"><i class="fas fa-arrow-right"></i></button>
@@ -333,7 +312,6 @@
     <div id="searchResultsGrid" class="prod-grid" style="padding-top:6px;padding-bottom:20px;"></div>
   </div>
 
-  <!-- FAVORITES -->
   <div id="favoritesScreen" class="screen">
     <div class="header-row">
       <button class="back-btn" onclick="switchScreen('home')"><i class="fas fa-arrow-right"></i></button>
@@ -342,7 +320,6 @@
     <div id="favoritesGrid" class="prod-grid" style="padding-bottom:20px;"></div>
   </div>
 
-  <!-- OFFERS -->
   <div id="offersScreen" class="screen">
     <div class="header-row">
       <button class="back-btn" onclick="switchScreen('home')"><i class="fas fa-arrow-right"></i></button>
@@ -351,7 +328,6 @@
     <div id="offersList" style="padding:0 16px 20px;"></div>
   </div>
 
-  <!-- CART -->
   <div id="cartScreen" class="screen">
     <div class="header-row header-dark" style="margin:0;">
       <button class="back-btn" onclick="switchScreen('home')"><i class="fas fa-arrow-right"></i></button>
@@ -360,7 +336,6 @@
     <div id="cartItemsWrap" style="padding-top:12px;flex:1;"></div>
   </div>
 
-  <!-- PROFILE COMPLETION -->
   <div id="profileScreen" class="screen">
     <div class="header-row header-dark" style="margin:0;">
       <button class="back-btn" onclick="switchScreen('confirm')"><i class="fas fa-arrow-right"></i></button>
@@ -379,7 +354,6 @@
     </div>
   </div>
 
-  <!-- CONFIRM -->
   <div id="confirmScreen" class="screen">
     <div class="header-row header-dark" style="margin:0;">
       <button class="back-btn" onclick="switchScreen('cart')"><i class="fas fa-arrow-right"></i></button>
@@ -402,13 +376,11 @@
     </div>
   </div>
 
-  <!-- ORDERS -->
   <div id="ordersScreen" class="screen">
     <div class="header-row"><div class="header-title">طلباتي</div></div>
     <div id="ordersList" style="padding-bottom:20px;"></div>
   </div>
 
-  <!-- ACCOUNT -->
   <div id="accountScreen" class="screen">
     <div class="header-row"><div class="header-title">حسابي</div></div>
     <div class="welcome-card" style="margin:0 16px;">
@@ -436,7 +408,6 @@
     </div>
   </div>
 
-  <!-- Bottom nav -->
   <div class="bottom-nav">
     <button class="nav-btn active" id="navHome" onclick="switchTopTab('home'); switchScreen('home')"><i class="fas fa-house"></i><span>الرئيسية</span></button>
     <button class="nav-btn" id="navOffers" onclick="switchTopTab('home'); switchScreen('offers')"><i class="fas fa-tag"></i><span>العروض</span></button>
@@ -447,7 +418,6 @@
   </div>
 </div>
 
-<!-- Rating modal -->
 <div class="modal-overlay" id="ratingModal">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -471,9 +441,6 @@
 <div id="toast"></div>
 
 <script>
-/* =========================================================================
-   إعدادات Firebase — نفس مشروع نظام المعلم بالظبط (بيانات + مخزون متزامنين)
-   ========================================================================= */
 const firebaseConfig = {
     apiKey: "AIzaSyCypCZMxYLYCOtQZSCVdQFdf1STPxBKzlc",
     authDomain: "almoallem-system.firebaseapp.com",
@@ -487,11 +454,48 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 /* =========================================================================
-   الحالة العامة
+   ====== إضافة: إشعارات Firebase Cloud Messaging (FCM) ======
    ========================================================================= */
+const messaging = firebase.messaging();
+
+// ⚠️ مهم: غير السطر ده بالمفتاح اللي هتجيبه من Firebase Console
+// Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Generate key pair
+const VAPID_KEY = "BOxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+async function initNotifications(){
+    if (!('Notification' in window)) {
+        console.log('المتصفح مش بيدعم الإشعارات');
+        return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+        console.log('العميل رفض الإشعارات');
+        return;
+    }
+    try {
+        const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+        if (token) {
+            await db.collection('fcmTokens').doc(customerPhone).set({
+                token: token,
+                phone: customerPhone,
+                updatedAt: Date.now(),
+                platform: 'web'
+            });
+            console.log('FCM Token saved:', token);
+        }
+    } catch (err) {
+        console.error('خطأ في جلب التوكن:', err);
+    }
+}
+
+messaging.onMessage((payload) => {
+    const n = payload.notification || {};
+    showToast(`${n.title}: ${n.body}`, 4000);
+});
+
 let products = [], appCategories = [], appBrands = [], appBanners = [], appOffers = [];
-let stockLevels = {}; // { productCode: qty }
-let cart = JSON.parse(localStorage.getItem('app_cart') || '{}'); // {code: {unit, qty}}
+let stockLevels = {};
+let cart = JSON.parse(localStorage.getItem('app_cart') || '{}');
 let favorites = JSON.parse(localStorage.getItem('app_favorites') || '[]');
 let customerPhone = localStorage.getItem('app_customer_phone') || null;
 let customerProfile = JSON.parse(localStorage.getItem('app_customer_profile') || 'null');
@@ -511,9 +515,6 @@ function showToast(msg, ms){
 }
 function showLoading(v){ document.getElementById('loadingOverlay').classList.toggle('hidden', !v); }
 
-/* =========================================================================
-   تسجيل الدخول (رقم الموبايل فقط)
-   ========================================================================= */
 document.getElementById('loginPhone').addEventListener('input', function(){
     document.getElementById('loginBtn').disabled = this.value.trim().length < 10;
 });
@@ -522,7 +523,6 @@ function doLogin(){
     if (phone.length < 10) return;
     customerPhone = phone;
     localStorage.setItem('app_customer_phone', phone);
-    // لو فيه بروفايل محفوظ محليًا لنفس الرقم، نحمّله؛ غير كده هيتطلب عند أول طلب
     startApp();
 }
 function doLogout(){
@@ -531,9 +531,6 @@ function doLogout(){
     location.reload();
 }
 
-/* =========================================================================
-   بدء التطبيق + الاستماع اللحظي لبيانات نظام المعلم
-   ========================================================================= */
 function startApp(){
     document.getElementById('loginScreen').classList.remove('active');
     document.getElementById('appRoot').classList.remove('hidden');
@@ -545,6 +542,7 @@ function startApp(){
     listenToStockLevels();
     listenToMyOrders();
     updateCartBadge();
+    initNotifications();
 }
 
 function listenToStoreData(){
@@ -590,9 +588,6 @@ function listenToMyOrders(){
     }, function(err){ console.error('orders listener error', err); });
 }
 
-/* =========================================================================
-   التنقل بين الشاشات
-   ========================================================================= */
 function switchScreen(name){
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(name + 'Screen').classList.add('active');
@@ -616,9 +611,6 @@ function switchTopTab(tab){
     if (tab === 'account') document.getElementById('navAccount').classList.add('active');
 }
 
-/* =========================================================================
-   عرض الرئيسية: الأقسام + الأكثر طلبًا
-   ========================================================================= */
 function categoryIconHtml(cat){
     if (cat.imageUrl) return `<img src="${cat.imageUrl}" class="cat-img">`;
     return `<div class="cat-icon"><i class="fas fa-box"></i></div>`;
@@ -665,9 +657,6 @@ function handleBannerClick(i){
     else if (b.linkType === 'product') { switchScreen('search'); document.getElementById('searchInput').value = ''; }
 }
 
-/* =========================================================================
-   الأقسام → الشركات → المنتجات
-   ========================================================================= */
 function openCategory(catId){
     activeCatId = catId; activeBrandName = null;
     const cat = appCategories.find(c => c.id === catId);
@@ -679,7 +668,7 @@ function openCategory(catId){
         <div class="brand-name">كل الأصناف</div></button>`;
     brandsInCat.forEach(b => {
         const count = products.filter(p => p.category === cat?.name && p.brand === b.name).length;
-        html += `<button class="brand-tile" onclick="openCategoryProducts('${b.name.replace(/'/g,"\\'")}')">
+        html += `<button class="brand-tile" onclick="openCategoryProducts('${b.name.replace(/'/g,"\'")}')">
             ${b.logoUrl ? `<img src="${b.logoUrl}" class="brand-logo">` : `<div class="brand-logo-fallback">${b.name.slice(0,2)}</div>`}
             <div class="brand-name">${b.name}</div><div class="brand-count">${count} صنف</div></button>`;
     });
@@ -693,7 +682,7 @@ function openCategoryProducts(brandName){
     const brandsInCat = appBrands.filter(b => b.categoryName === cat?.name);
     const pillsWrap = document.getElementById('categoryBrandPills');
     pillsWrap.innerHTML = `<button class="pill ${!activeBrandName?'active':''}" onclick="openCategoryProducts(null)">الكل</button>` +
-        brandsInCat.map(b => `<button class="pill ${activeBrandName===b.name?'active':''}" onclick="openCategoryProducts('${b.name.replace(/'/g,"\\'")}')">${b.name}</button>`).join('');
+        brandsInCat.map(b => `<button class="pill ${activeBrandName===b.name?'active':''}" onclick="openCategoryProducts('${b.name.replace(/'/g,"\'")}')">${b.name}</button>`).join('');
     renderCategoryProducts();
     switchScreen('category');
 }
@@ -707,9 +696,6 @@ function renderCategoryProducts(){
     grid.innerHTML = list.length ? list.map(p => productCardHtml(p)).join('') : `<div class="empty-note" style="grid-column:1/-1;">لا توجد أصناف حاليًا</div>`;
 }
 
-/* =========================================================================
-   البحث والمفضلة
-   ========================================================================= */
 function renderSearchResults(){
     const q = document.getElementById('searchInput').value.trim();
     const grid = document.getElementById('searchResultsGrid');
@@ -733,9 +719,6 @@ function renderFavorites(){
         : `<div class="empty-note" style="grid-column:1/-1;">مفيش أصناف في المفضلة لسه<br>دوس على النجمة فوق أي صنف عشان تضيفه هنا</div>`;
 }
 
-/* =========================================================================
-   العروض
-   ========================================================================= */
 function renderOffers(){
     const wrap = document.getElementById('offersList');
     if (appOffers.length === 0){ wrap.innerHTML = `<div class="empty-note">لا توجد عروض حاليًا</div>`; return; }
@@ -755,7 +738,7 @@ function renderOffers(){
                 </div>
             </div>
             <button style="font-size:10px;font-weight:800;padding:8px 14px;border-radius:12px;background:var(--maroon);color:var(--cream);flex-shrink:0;"
-                onclick="${p ? `openCategoryFromOffer('${(p.category||'').replace(/'/g,"\\'")}')` : ''}">اطلب</button>
+                onclick="${p ? `openCategoryFromOffer('${(p.category||'').replace(/'/g,"\'")}')` : ''}">اطلب</button>
         </div>`;
     }).join('');
 }
@@ -764,9 +747,6 @@ function openCategoryFromOffer(categoryName){
     if (cat) openCategory(cat.id); else switchScreen('search');
 }
 
-/* =========================================================================
-   كارت المنتج (HTML مشترك لكل الشاشات)
-   ========================================================================= */
 function productCardHtml(p){
     const stock = getStock(p.code);
     const oos = stock <= 0;
@@ -848,9 +828,6 @@ function getCartLineItems(){
 }
 function getCartTotal(){ return getCartLineItems().reduce((s,l)=>s+l.lineTotal,0); }
 
-/* =========================================================================
-   السلة
-   ========================================================================= */
 function renderCart(){
     const lines = getCartLineItems();
     const wrap = document.getElementById('cartItemsWrap');
@@ -894,9 +871,6 @@ function applyLastOrder(){
     switchScreen('cart');
 }
 
-/* =========================================================================
-   تأكيد الطلب + استكمال البروفايل عند أول طلب
-   ========================================================================= */
 function renderConfirm(){
     const lines = getCartLineItems();
     document.getElementById('confirmSummary').innerHTML = `
@@ -983,9 +957,6 @@ function sendOrderToServer(){
     });
 }
 
-/* =========================================================================
-   طلباتي
-   ========================================================================= */
 const STATUS_LABELS = { pending: ['قيد المراجعة', 'status-pending'], fulfilled: ['تم التجهيز والتوصيل', 'status-fulfilled'], rejected: ['مرفوض', 'status-rejected'] };
 function renderOrders(){
     const wrap = document.getElementById('ordersList');
@@ -1003,9 +974,6 @@ function renderOrders(){
     }).join('');
 }
 
-/* =========================================================================
-   تقييم الطلب
-   ========================================================================= */
 function openRatingModal(orderId){
     currentRatingOrderId = orderId; currentRatingStars = 5;
     document.getElementById('ratingComment').value = '';
@@ -1034,9 +1002,6 @@ function submitRating(){
     }).catch(function(){ showToast('تعذر إرسال التقييم'); });
 }
 
-/* =========================================================================
-   بدء التشغيل — عرض شاشة الافتتاح ثم الانتقال المناسب
-   ========================================================================= */
 function hideSplash(){
     const splash = document.getElementById('splashScreen');
     splash.classList.add('fade-out');
