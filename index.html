@@ -11,6 +11,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{--maroon:#7A1F1F;--maroon-dark:#5E1414;--gold:#D4A017;--cream:#FBF3E7;--sand:#F3E4CB;--card:#FFFDF9;--border:#F0E4CE;--ink:#3B2417;--muted:#8a7460;--danger:#B23A2E;--success:#2E7D42;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -388,11 +390,24 @@
 <script>
 
 /* ======================================================================
-   المعلم - تطبيق العملاء (يعمل عبر localStorage المشترك مع السيستم)
-   المفاتيح المستخدمة هي نفس مفاتيح السيستم:
-   - products, inventory, appCategories, appBrands, appBanners, appOffers
-   - customers (للنقاط), customerOrders (للطلبات)
+   المعلم - تطبيق العملاء
+   البيانات (المنتجات/الفئات/البراندات/البنرات/العروض/المخزون) بتتقرا لحظيًا
+   من Firebase (نفس مستند storeData/main اللي نظام المعلم بيرفعه أول أي تعديل)
+   بدل localStorage، لأن localStorage محلي لكل جهاز لوحده ومش بيوصل لجهاز
+   العميل. localStorage هنا بيتستخدم بس كـ "كاش" لفتح سريع/أوفلاين.
+   الطلبات وتقييماتها بتتحفظ مباشرة في Firestore collection: customerOrders
    ===================================================================== */
+
+const firebaseConfig = {
+    apiKey: "AIzaSyCypCZMxYLYCOtQZSCVdQFdf1STPxBKzlc",
+    authDomain: "almoallem-system.firebaseapp.com",
+    projectId: "almoallem-system",
+    storageBucket: "almoallem-system.firebasestorage.app",
+    messagingSenderId: "451766637006",
+    appId: "1:451766637006:web:f4a727eb92ef24df0fdb9f",
+    measurementId: "G-C5HBP932YR"
+};
+let db = null;
 
 function getStorage(key, fallback){
   try { var d = localStorage.getItem(key); return d ? JSON.parse(d) : fallback; }
@@ -438,32 +453,76 @@ function formatDate(ts){
   } catch(e) { return '-'; }
 }
 
-/* --- استماع للتغييرات من تابات/نوافذ أخرى (نفس الـ origin) --- */
-window.addEventListener('storage', function(e){
-  if (e.key === 'products' || e.key === 'inventory' ||
-      e.key === 'appCategories' || e.key === 'appBrands' ||
-      e.key === 'appBanners' || e.key === 'appOffers') {
-    loadStoreData();
-    renderHome(); renderAdBanners();
-    if (document.getElementById('categoryScreen').classList.contains('active')) renderCategoryProducts();
-    if (document.getElementById('searchScreen').classList.contains('active')) renderSearchResults();
-    if (document.getElementById('favoritesScreen').classList.contains('active')) renderFavorites();
-  }
-  if (e.key === 'customerOrders') {
-    loadMyOrders(); renderOrders();
-  }
-});
-
-/* --- polling كل ثانيتين كـ fallback --- */
-setInterval(function(){
-  loadStoreData();
-  loadMyOrders();
+/* --- إعادة رسم أي شاشة مفتوحة حاليًا بعد وصول تحديث (منتجات أو طلبات) --- */
+function refreshVisibleScreens(){
   renderHome(); renderAdBanners();
   if (document.getElementById('categoryScreen').classList.contains('active')) renderCategoryProducts();
   if (document.getElementById('searchScreen').classList.contains('active')) renderSearchResults();
   if (document.getElementById('favoritesScreen').classList.contains('active')) renderFavorites();
-  if (document.getElementById('ordersScreen').classList.contains('active')) renderOrders();
-}, 2000);
+}
+
+/* --- الاتصال بالسحابة: قراءة المنتجات/الفئات/البراندات/البنرات/العروض/المخزون لحظيًا --- */
+let storeDataListenerStarted = false;
+function initCloud(){
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    listenStoreData();
+    listenMyOrders();
+  } catch (e) {
+    console.error('Firebase init error:', e);
+    loadStoreDataFromLocalCache();
+    refreshVisibleScreens();
+    showToast('تعذر الاتصال بالسحابة، بيتم عرض آخر نسخة محفوظة');
+  }
+}
+
+function applyStoreData(data){
+  products      = (data.products || []).filter(function(p){ return p.showInApp !== false; });
+  appCategories = (data.appCategories || []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appBrands     = (data.appBrands || []).filter(function(b){ return b.active !== false; });
+  appBanners    = (data.appBanners || []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appOffers     = (data.appOffers || []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
+  var inv = data.inventory || {};
+  stockLevels = {};
+  for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
+  // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
+  setStorage('products', data.products || []);
+  setStorage('appCategories', data.appCategories || []);
+  setStorage('appBrands', data.appBrands || []);
+  setStorage('appBanners', data.appBanners || []);
+  setStorage('appOffers', data.appOffers || []);
+  setStorage('inventory', inv);
+  setStorage('customers', data.customers || []);
+  loadLoyaltyPoints();
+}
+
+function listenStoreData(){
+  if (storeDataListenerStarted) return;
+  storeDataListenerStarted = true;
+  db.collection('storeData').doc('main').onSnapshot(function(docSnap){
+    if (!docSnap.exists) { loadStoreDataFromLocalCache(); refreshVisibleScreens(); return; }
+    applyStoreData(docSnap.data());
+    refreshVisibleScreens();
+  }, function(err){
+    console.error('Store data listener error:', err);
+    loadStoreDataFromLocalCache();
+    refreshVisibleScreens();
+    showToast('تعذر تحديث بيانات المتجر من السحابة');
+  });
+}
+
+/* --- نسخة احتياطية أوفلاين: آخر بيانات محفوظة محليًا على نفس الجهاز --- */
+function loadStoreDataFromLocalCache(){
+  products      = getStorage('products', []).filter(function(p){ return p.showInApp !== false; });
+  appCategories = getStorage('appCategories', []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appBrands     = getStorage('appBrands', []).filter(function(b){ return b.active !== false; });
+  appBanners    = getStorage('appBanners', []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appOffers     = getStorage('appOffers', []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
+  var inv = getStorage('inventory', {});
+  stockLevels = {};
+  for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
+}
 
 document.getElementById('loginPhone').addEventListener('input', function(){
   document.getElementById('loginBtn').disabled = this.value.trim().length < 10;
@@ -488,30 +547,27 @@ function startApp(){
   document.getElementById('accountCustomerName').textContent = customerProfile && customerProfile.customerName ? customerProfile.customerName : 'بيانات غير مكتملة بعد';
   document.getElementById('accountPhone').textContent = customerPhone;
   showLoading(true);
-  loadStoreData();
+  // فتح فوري بآخر نسخة محفوظة (لو الجهاز اتفتح عليه الأبليكشن قبل كده)، لحد ما بيانات السحابة توصل
+  loadStoreDataFromLocalCache();
   loadMyOrders();
   loadLoyaltyPoints();
   updateCartBadge();
   renderHome();
   renderAdBanners();
   showLoading(false);
+  initCloud();
 }
 
-function loadStoreData(){
-  products      = getStorage('products', []).filter(function(p){ return p.showInApp !== false; });
-  appCategories = getStorage('appCategories', []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appBrands     = getStorage('appBrands', []).filter(function(b){ return b.active !== false; });
-  appBanners    = getStorage('appBanners', []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appOffers     = getStorage('appOffers', []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
-
-  // المخزون: السيستم بيخزنه في inventory كـ object {code: {code, qty, cost, minStock}}
-  var inv = getStorage('inventory', {});
-  stockLevels = {};
-  for (var code in inv) {
-    if (inv.hasOwnProperty(code)) {
-      stockLevels[code] = inv[code].qty || 0;
-    }
-  }
+function listenMyOrders(){
+  if (!customerPhone || !db) return;
+  db.collection('customerOrders').where('customerCode', '==', customerPhone).onSnapshot(function(snap){
+    myOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    myOrders.sort(function(a,b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
+    setStorage('customerOrders', myOrders);
+    if (document.getElementById('ordersScreen').classList.contains('active')) renderOrders();
+  }, function(err){
+    console.error('Orders listener error:', err);
+  });
 }
 
 function loadMyOrders(){
@@ -880,6 +936,7 @@ function submitProfile(){
 function sendOrderToServer(){
   var lines = getCartLineItems();
   if (lines.length === 0) return;
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا، حاول تاني', 'error'); return; }
   showLoading(true);
   var items = lines.map(function(l){
     return {
@@ -887,8 +944,9 @@ function sendOrderToServer(){
       unit: l.unitLabel, qty: l.entry.qty, price: l.unitPrice, total: l.lineTotal
     };
   });
+  var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var order = {
-    id: 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+    id: orderId,
     customerCode: customerPhone,
     customerName: customerProfile.customerName,
     shopName: customerProfile.shopName,
@@ -900,17 +958,21 @@ function sendOrderToServer(){
     status: 'pending',
     createdAt: Date.now()
   };
-  var orders = getStorage('customerOrders', []);
-  orders.push(order);
-  setStorage('customerOrders', orders);
-  lastOrderItems = JSON.parse(JSON.stringify(cart));
-  localStorage.setItem('app_last_order', JSON.stringify(lastOrderItems));
-  cart = {};
-  localStorage.setItem('app_cart', '{}');
-  updateCartBadge();
-  showLoading(false);
-  showToast('تم إرسال الطلب بنجاح ✓');
-  switchTopTab('home'); switchScreen('home');
+  // الطلب بيتبعت مباشرة لـ Firestore، وده هو المصدر اللي نظام المعلم بيتابعه لحظيًا
+  db.collection('customerOrders').doc(orderId).set(order).then(function(){
+    lastOrderItems = JSON.parse(JSON.stringify(cart));
+    localStorage.setItem('app_last_order', JSON.stringify(lastOrderItems));
+    cart = {};
+    localStorage.setItem('app_cart', '{}');
+    updateCartBadge();
+    showLoading(false);
+    showToast('تم إرسال الطلب بنجاح ✓');
+    switchTopTab('home'); switchScreen('home');
+  }).catch(function(err){
+    console.error('Order send failed:', err);
+    showLoading(false);
+    showToast('تعذر إرسال الطلب، تأكد من الاتصال بالإنترنت وحاول تاني', 'error');
+  });
 }
 
 var STATUS_LABELS = {
@@ -956,15 +1018,12 @@ document.getElementById('ratingStars').addEventListener('click', function(e){
 });
 function submitRating(){
   var comment = document.getElementById('ratingComment').value.trim();
-  var orders = getStorage('customerOrders', []);
-  var idx = orders.findIndex(function(o){ return o.id === currentRatingOrderId; });
-  if (idx !== -1) {
-    orders[idx].rating = { stars: currentRatingStars, comment: comment, ratedAt: Date.now() };
-    setStorage('customerOrders', orders);
-    loadMyOrders();
-  }
+  var rating = { stars: currentRatingStars, comment: comment, ratedAt: Date.now() };
   closeRatingModal();
-  showToast('شكرًا لتقييمك ✓');
+  if (!db) { showToast('تعذر إرسال التقييم، لا يوجد اتصال بالإنترنت', 'error'); return; }
+  db.collection('customerOrders').doc(currentRatingOrderId).update({ rating: rating })
+    .then(function(){ showToast('شكرًا لتقييمك ✓'); })
+    .catch(function(err){ console.error('Rating update failed:', err); showToast('تعذر إرسال التقييم، حاول تاني', 'error'); });
 }
 
 function hideSplash(){
