@@ -457,6 +457,21 @@ function showToast(msg, ms){
 }
 function showLoading(v){ document.getElementById('loadingOverlay').classList.toggle('hidden', !v); }
 
+function getTimeValue(ts){
+    if (!ts) return 0;
+    if (ts.toDate) return ts.toDate().getTime();
+    if (typeof ts === 'number') return ts;
+    return 0;
+}
+
+function formatDate(ts){
+    if (!ts) return '-';
+    try {
+        if (ts.toDate) return ts.toDate().toLocaleString('ar-EG');
+        return new Date(ts).toLocaleString('ar-EG');
+    } catch(e) { return '-'; }
+}
+
 document.getElementById('loginPhone').addEventListener('input', function(){
     document.getElementById('loginBtn').disabled = this.value.trim().length < 10;
 });
@@ -496,17 +511,22 @@ function listenToStoreData(){
         appBrands = (data.appBrands || []).filter(function(b){return b.active !== false;});
         appBanners = (data.appBanners || []).filter(function(b){return b.active !== false;}).sort(function(a,b){return a.order-b.order;});
         appOffers = (data.appOffers || []).filter(function(o){return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date());});
+
+        // نقاط الولاء
         var customers = data.customers || [];
         var foundCustomer = null;
         for (var i = 0; i < customers.length; i++){
             if (customers[i].code === customerPhone) { foundCustomer = customers[i]; break; }
         }
-        document.getElementById('accountPoints').textContent = foundCustomer ? (foundCustomer.loyaltyPoints || 0) : 0;
+        var points = foundCustomer ? (foundCustomer.loyaltyPoints || 0) : 0;
+        console.log('Loyalty points for', customerPhone, ':', points, 'Found customer:', foundCustomer);
+        document.getElementById('accountPoints').textContent = points;
+
         renderHome();
         renderAdBanners();
         showLoading(false);
     }, function(err){
-        console.error(err);
+        console.error('storeData error:', err);
         showLoading(false);
         showToast('تعذر الاتصال بالسيرفر، تأكد من الإنترنت');
     });
@@ -526,12 +546,27 @@ function listenToStockLevels(){
 function getStock(code){ return stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999; }
 function inStockOnly(list){ return list.filter(function(p){return getStock(p.code) > 0;}); }
 
+/* =========================================================================
+   طلباتي - مُصلّح: بدون orderBy عشان مش محتاج index
+   ========================================================================= */
 function listenToMyOrders(){
     if (!customerPhone) return;
-    db.collection('customerOrders').where('customerCode', '==', customerPhone).orderBy('createdAt', 'desc').onSnapshot(function(snap){
+    console.log('Listening to orders for:', customerPhone);
+
+    db.collection('customerOrders').where('customerCode', '==', customerPhone).onSnapshot(function(snap){
+        console.log('Orders snapshot received, count:', snap.docs.length);
         myOrders = snap.docs.map(function(d){return Object.assign({ id: d.id }, d.data());});
+
+        // ترتيب يدوي في الـ client (بدل orderBy اللي محتاج index)
+        myOrders.sort(function(a,b){
+            return getTimeValue(b.createdAt) - getTimeValue(a.createdAt);
+        });
+
         renderOrders();
-    }, function(err){ console.error('orders listener error', err); });
+    }, function(err){ 
+        console.error('orders listener error:', err);
+        showToast('مشكلة في تحميل الطلبات: ' + (err.message || 'غير معروف'));
+    });
 }
 
 function switchScreen(name){
@@ -933,14 +968,18 @@ var STATUS_LABELS = {
     rejected: ['مرفوض', 'status-rejected']
 };
 
+/* =========================================================================
+   طلباتي - مُصلّح: بيتعامل مع Timestamp وأرقام
+   ========================================================================= */
 function renderOrders(){
     var wrap = document.getElementById('ordersList');
+    console.log('Rendering orders, count:', myOrders.length);
     if (myOrders.length === 0){ wrap.innerHTML = '<div class="empty-note">لسه معملتش أي طلبات</div>'; return; }
     wrap.innerHTML = myOrders.map(function(o){
         var statusInfo = STATUS_LABELS[o.status] || STATUS_LABELS.pending;
         var label = statusInfo[0], cls = statusInfo[1];
         var summary = (o.items || []).map(function(i){return i.productName + ' × ' + i.qty;}).join('، ');
-        var dateStr = o.createdAt ? (o.createdAt.toDate ? o.createdAt.toDate().toLocaleString('ar-EG') : new Date(o.createdAt).toLocaleString('ar-EG')) : '-';
+        var dateStr = formatDate(o.createdAt);
         return '<div class="order-card">' +
             '<div class="order-top"><span class="order-id">طلب #' + o.id.slice(-6) + '</span><span class="order-date">' + dateStr + '</span></div>' +
             '<div class="order-summary">' + summary + ' — <strong style="color:var(--maroon);">' + money(o.total) + ' ج.م</strong></div>' +
