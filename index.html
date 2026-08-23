@@ -389,18 +389,10 @@
 
 /* ======================================================================
    المعلم - تطبيق العملاء (يعمل عبر localStorage المشترك مع السيستم)
+   المفاتيح المستخدمة هي نفس مفاتيح السيستم:
+   - products, inventory, appCategories, appBrands, appBanners, appOffers
+   - customers (للنقاط), customerOrders (للطلبات)
    ===================================================================== */
-
-const STORAGE_KEYS = {
-  PRODUCTS:      'almoallem_products',
-  STOCK:         'almoallem_stock',
-  CATEGORIES:    'almoallem_categories',
-  BRANDS:        'almoallem_brands',
-  BANNERS:       'almoallem_banners',
-  OFFERS:        'almoallem_offers',
-  ORDERS:        'almoallem_orders',
-  CUSTOMERS:     'almoallem_customers'
-};
 
 function getStorage(key, fallback){
   try { var d = localStorage.getItem(key); return d ? JSON.parse(d) : fallback; }
@@ -448,16 +440,16 @@ function formatDate(ts){
 
 /* --- استماع للتغييرات من تابات/نوافذ أخرى (نفس الـ origin) --- */
 window.addEventListener('storage', function(e){
-  if (e.key === STORAGE_KEYS.PRODUCTS || e.key === STORAGE_KEYS.STOCK ||
-      e.key === STORAGE_KEYS.CATEGORIES || e.key === STORAGE_KEYS.BRANDS ||
-      e.key === STORAGE_KEYS.BANNERS || e.key === STORAGE_KEYS.OFFERS) {
+  if (e.key === 'products' || e.key === 'inventory' ||
+      e.key === 'appCategories' || e.key === 'appBrands' ||
+      e.key === 'appBanners' || e.key === 'appOffers') {
     loadStoreData();
     renderHome(); renderAdBanners();
     if (document.getElementById('categoryScreen').classList.contains('active')) renderCategoryProducts();
     if (document.getElementById('searchScreen').classList.contains('active')) renderSearchResults();
     if (document.getElementById('favoritesScreen').classList.contains('active')) renderFavorites();
   }
-  if (e.key === STORAGE_KEYS.ORDERS) {
+  if (e.key === 'customerOrders') {
     loadMyOrders(); renderOrders();
   }
 });
@@ -506,23 +498,31 @@ function startApp(){
 }
 
 function loadStoreData(){
-  products      = getStorage(STORAGE_KEYS.PRODUCTS, []).filter(function(p){ return p.showInApp !== false; });
-  appCategories = getStorage(STORAGE_KEYS.CATEGORIES, []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appBrands     = getStorage(STORAGE_KEYS.BRANDS, []).filter(function(b){ return b.active !== false; });
-  appBanners    = getStorage(STORAGE_KEYS.BANNERS, []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appOffers     = getStorage(STORAGE_KEYS.OFFERS, []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
-  stockLevels   = getStorage(STORAGE_KEYS.STOCK, {});
+  products      = getStorage('products', []).filter(function(p){ return p.showInApp !== false; });
+  appCategories = getStorage('appCategories', []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appBrands     = getStorage('appBrands', []).filter(function(b){ return b.active !== false; });
+  appBanners    = getStorage('appBanners', []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  appOffers     = getStorage('appOffers', []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
+
+  // المخزون: السيستم بيخزنه في inventory كـ object {code: {code, qty, cost, minStock}}
+  var inv = getStorage('inventory', {});
+  stockLevels = {};
+  for (var code in inv) {
+    if (inv.hasOwnProperty(code)) {
+      stockLevels[code] = inv[code].qty || 0;
+    }
+  }
 }
 
 function loadMyOrders(){
   if (!customerPhone) return;
-  var allOrders = getStorage(STORAGE_KEYS.ORDERS, []);
+  var allOrders = getStorage('customerOrders', []);
   myOrders = allOrders.filter(function(o){ return o.customerCode === customerPhone; });
   myOrders.sort(function(a,b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
 }
 
 function loadLoyaltyPoints(){
-  var customers = getStorage(STORAGE_KEYS.CUSTOMERS, []);
+  var customers = getStorage('customers', []);
   var found = null;
   for (var i = 0; i < customers.length; i++){ if (customers[i].code === customerPhone) { found = customers[i]; break; } }
   var points = found ? (found.loyaltyPoints || 0) : 0;
@@ -900,9 +900,9 @@ function sendOrderToServer(){
     status: 'pending',
     createdAt: Date.now()
   };
-  var orders = getStorage(STORAGE_KEYS.ORDERS, []);
+  var orders = getStorage('customerOrders', []);
   orders.push(order);
-  setStorage(STORAGE_KEYS.ORDERS, orders);
+  setStorage('customerOrders', orders);
   lastOrderItems = JSON.parse(JSON.stringify(cart));
   localStorage.setItem('app_last_order', JSON.stringify(lastOrderItems));
   cart = {};
@@ -956,11 +956,11 @@ document.getElementById('ratingStars').addEventListener('click', function(e){
 });
 function submitRating(){
   var comment = document.getElementById('ratingComment').value.trim();
-  var orders = getStorage(STORAGE_KEYS.ORDERS, []);
+  var orders = getStorage('customerOrders', []);
   var idx = orders.findIndex(function(o){ return o.id === currentRatingOrderId; });
   if (idx !== -1) {
     orders[idx].rating = { stars: currentRatingStars, comment: comment, ratedAt: Date.now() };
-    setStorage(STORAGE_KEYS.ORDERS, orders);
+    setStorage('customerOrders', orders);
     loadMyOrders();
   }
   closeRatingModal();
