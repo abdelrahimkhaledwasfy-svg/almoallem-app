@@ -134,6 +134,19 @@
   .status-pending{background:#FBE9C6;color:#8a6a12;}
   .status-fulfilled{background:#DDF0E1;color:var(--success);}
   .status-rejected{background:#FBE3C9;color:var(--danger);}
+  .order-steps{display:flex;align-items:flex-start;margin:10px 2px 14px;}
+  .order-step{flex:1;text-align:center;position:relative;}
+  .order-step .dot{width:22px;height:22px;border-radius:50%;background:var(--sand);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:10px;color:var(--muted);position:relative;z-index:2;}
+  .order-step .line{position:absolute;top:11px;right:50%;width:100%;height:2px;background:var(--border);z-index:1;}
+  .order-step:first-child .line{display:none;}
+  .order-step .lbl{font-size:9px;color:var(--muted);font-weight:700;}
+  .order-step.done .dot{background:var(--success);border-color:var(--success);color:#fff;}
+  .order-step.done .line{background:var(--success);}
+  .order-step.done .lbl{color:var(--success);}
+  .order-step.active .dot{background:var(--gold);border-color:var(--gold);color:#fff;animation:pulseDot 1.4s infinite;}
+  .order-step.active .lbl{color:var(--gold);font-weight:800;}
+  @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(212,160,23,0.5);}70%{box-shadow:0 0 0 8px rgba(212,160,23,0);}100%{box-shadow:0 0 0 0 rgba(212,160,23,0);}}
+  .order-rejected-box{background:#FBE3C9;color:var(--danger);border-radius:12px;padding:10px 12px;font-size:11px;font-weight:800;text-align:center;margin:10px 0 4px;}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .modal-overlay{position:fixed;inset:0;background:rgba(36,21,18,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
@@ -174,13 +187,36 @@
   <div class="splash-dots"><div class="splash-dot"></div><div class="splash-dot"></div><div class="splash-dot"></div></div>
 </div>
 
-<div id="loginScreen" class="screen">
-  <img src="icon-512.png" class="login-logo" alt="المعلم">
-  <div style="font-size:18px;font-weight:900;margin-bottom:4px;">أهلاً بيك في المعلم</div>
-  <div style="font-size:11.5px;color:var(--muted);margin-bottom:22px;">سجّل برقم موبايلك وابدأ تصفح الكتالوج فورًا</div>
-  <input type="tel" id="loginPhone" class="login-input" placeholder="01xxxxxxxxx" style="direction:ltr;" maxlength="11">
-  <button class="btn-primary" id="loginBtn" disabled onclick="doLogin()">دخول وتصفح الكتالوج</button>
-  <div style="font-size:9.5px;color:#B7935F;margin-top:12px;">هنطلب باقي بياناتك بس عند أول طلب</div>
+<div id="loginScreen" class="screen" style="justify-content:flex-start;padding-top:24px;">
+  <img src="icon-512.png" class="login-logo" style="width:56px;height:56px;margin-bottom:8px;" alt="المعلم">
+  <div style="font-size:16px;font-weight:900;margin-bottom:2px;">أهلاً بيك في المعلم</div>
+  <div style="font-size:10.5px;color:var(--muted);margin-bottom:16px;">سجّل بياناتك مرة واحدة عشان نقدر نوصلك طلباتك</div>
+
+  <div class="form-group" style="text-align:right;width:100%;"><label class="form-label">اسم العميل</label><input class="form-input" id="regCustomerName" placeholder="مثال: أبو باسم"></div>
+  <div class="form-group" style="text-align:right;width:100%;"><label class="form-label">اسم المحل</label><input class="form-input" id="regShopName" placeholder="مثال: بقالة ابوباسم"></div>
+  <div class="form-group" style="text-align:right;width:100%;"><label class="form-label">العنوان بالتفصيل</label><textarea class="form-textarea" id="regAddress" rows="2" placeholder="اسم الشارع، أقرب علامة مميزة..."></textarea></div>
+  <div class="form-group" style="text-align:right;width:100%;">
+    <label class="form-label">رقم التليفون</label>
+    <input type="tel" id="loginPhone" class="login-input" placeholder="01xxxxxxxxx" style="direction:ltr;margin:0;" maxlength="11">
+  </div>
+  <div class="form-group" style="text-align:right;width:100%;">
+    <label class="form-label">تحديد الموقع (اللوكيشن)</label>
+    <button class="map-btn" id="regMapBtn" onclick="captureLocation()" type="button"><i class="fas fa-location-dot"></i> <span>تحديد موقعي الحالي</span></button>
+  </div>
+  <div class="form-group" style="text-align:right;width:100%;">
+    <label class="form-label">الحي</label>
+    <select class="form-input" id="regNeighborhood"><option value="">اختر الحي</option></select>
+  </div>
+  <div class="form-group" style="text-align:right;width:100%;">
+    <label class="form-label">المدينة</label>
+    <select class="form-input" id="regCity"><option value="">اختر المدينة</option></select>
+  </div>
+  <div class="form-group" style="text-align:right;width:100%;">
+    <label class="form-label">المحافظة</label>
+    <select class="form-input" id="regGovernorate"><option value="أسوان">أسوان</option></select>
+  </div>
+
+  <button class="btn-primary" id="loginBtn" onclick="doRegisterAndLogin()">دخول وتصفح الكتالوج</button>
 </div>
 
 <div id="appRoot" class="hidden">
@@ -422,6 +458,15 @@ function setStorage(key, val){
   try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){}
 }
 
+// قوائم المدن والأحياء بمحافظة أسوان — قابلة للتعديل بسهولة، لو محتاج تضيف/تغيّر أي اسم قولّي
+const ASWAN_CITIES = ['أسوان', 'كوم أمبو', 'إدفو', 'دراو', 'نصر النوبة', 'البصيلية', 'الرديسية', 'كلابشة'];
+const ASWAN_NEIGHBORHOODS = [
+  'السيل الشرقي بحري', 'السيل الشرقي قبلي', 'السيل الغربي', 'المدينة القديمة (وسط البلد)',
+  'كورنيش النيل', 'أسوان الجديدة', 'كيما', 'المطار', 'عبد المنعم رياض', 'النوبة الجديدة (دهمية)',
+  'جزيرة الفنتين', 'كوم أمبو - المدينة', 'إدفو - المدينة', 'دراو - المدينة', 'نصر النوبة - المدينة',
+  'البصيلية - المدينة', 'الرديسية - المدينة', 'كلابشة - المدينة', 'أخرى'
+];
+
 let products = [], appCategories = [], appBrands = [], appBanners = [], appOffers = [];
 let stockLevels = {};
 let cart = JSON.parse(localStorage.getItem('app_cart') || '{}');
@@ -434,6 +479,8 @@ let activeCatId = null, activeBrandName = null;
 let adIndex = 0, adTimer = null;
 let deliveryTime = 'morning';
 let currentRatingOrderId = null, currentRatingStars = 5;
+let regLocationCoords = null;
+let editingProfile = false;
 const MIN_ORDER_AMOUNT = 100;
 
 function money(n){ return (n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -569,6 +616,7 @@ function listenMyOrders(){
     myOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
     myOrders.sort(function(a,b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
     setStorage('customerOrders', myOrders);
+    detectOrderStatusChanges(myOrders);
     if (document.getElementById('ordersScreen').classList.contains('active')) renderOrders();
   }, function(err){
     console.error('Orders listener error:', err);
@@ -994,13 +1042,40 @@ function renderOrders(){
     var label = statusInfo[0], cls = statusInfo[1];
     var summary = (o.items || []).map(function(i){return i.productName + ' × ' + i.qty;}).join('، ');
     var dateStr = formatDate(o.createdAt);
+    var stepsHtml;
+    if (o.status === 'rejected') {
+      stepsHtml = '<div class="order-rejected-box"><i class="fas fa-circle-xmark"></i> تم رفض الطلب — للاستفسار اتصل بالمعلم</div>';
+    } else {
+      var s2active = o.status === 'pending';
+      var s2done = o.status === 'fulfilled';
+      var s3done = o.status === 'fulfilled';
+      stepsHtml = '<div class="order-steps">' +
+        '<div class="order-step done"><div class="line"></div><div class="dot"><i class="fas fa-check"></i></div><div class="lbl">تم الاستلام</div></div>' +
+        '<div class="order-step ' + (s2done ? 'done' : (s2active ? 'active' : '')) + '"><div class="line"></div><div class="dot">' + (s2done ? '<i class="fas fa-check"></i>' : '2') + '</div><div class="lbl">جاري التجهيز</div></div>' +
+        '<div class="order-step ' + (s3done ? 'done' : '') + '"><div class="line"></div><div class="dot">' + (s3done ? '<i class="fas fa-check"></i>' : '3') + '</div><div class="lbl">تم التجهيز</div></div>' +
+        '</div>';
+    }
     return '<div class="order-card">' +
         '<div class="order-top"><span class="order-id">طلب #' + o.id.slice(-6) + '</span><span class="order-date">' + dateStr + '</span></div>' +
+        stepsHtml +
         '<div class="order-summary">' + summary + ' — <strong style="color:var(--maroon);">' + money(o.total) + ' ج.م</strong></div>' +
         '<span class="status-badge ' + cls + '">' + label + '</span>' +
         (o.status === 'fulfilled' ? '<button class="action-btn" style="margin-top:10px;" onclick="openRatingModal(&#39;' + o.id + '&#39;)"><i class="fas fa-star"></i> قيّم الطلب</button>' : '') +
         '</div>';
   }).join('');
+}
+
+// كشف تغيّر حالة أي طلب مقارنة بآخر نسخة معروفة، لعرض تنبيه فوري للعميل وهو فاتح الأبليكشن
+var lastKnownOrderStatuses = {};
+function detectOrderStatusChanges(newOrders){
+  newOrders.forEach(function(o){
+    var prev = lastKnownOrderStatuses[o.id];
+    if (prev && prev !== o.status) {
+      if (o.status === 'fulfilled') showToast('تم تجهيز طلبك #' + o.id.slice(-6) + ' ✓', 3500);
+      else if (o.status === 'rejected') showToast('للأسف تم رفض طلبك #' + o.id.slice(-6), 3500);
+    }
+    lastKnownOrderStatuses[o.id] = o.status;
+  });
 }
 
 function openRatingModal(orderId){
