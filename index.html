@@ -574,8 +574,10 @@ function refreshVisibleScreens(){
 let storeDataListenerStarted = false;
 function initCloud(){
   try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
+    if (!db) {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+    }
     listenStoreData();
     listenMyOrders();
   } catch (e) {
@@ -1309,7 +1311,10 @@ function hideSplash(){
   splash.classList.add('fade-out');
   setTimeout(function(){ splash.style.display = 'none'; }, 500);
   if (customerPhone || isGuest){ startApp(); }
-  else { document.getElementById('loginScreen').classList.add('active'); }
+  else {
+    document.getElementById('loginScreen').classList.add('active');
+    initCloud(); // نفعّل الاتصال بالسحابة من هنا عشان db يبقى جاهز لحظة ما المستخدم يدوس تسجيل الدخول/إنشاء حساب
+  }
 }
 setTimeout(hideSplash, 1700);
 </script>
