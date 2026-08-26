@@ -62,13 +62,18 @@
   .section-head{display:flex;align-items:center;gap:8px;margin:20px 16px 12px;}
   .section-bar{width:4px;height:16px;border-radius:2px;background:var(--maroon);}
   .section-title{font-size:13px;font-weight:800;}
-  .ad-banner{margin:14px 16px 0;border-radius:18px;padding:16px;height:88px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);}
-  .ad-banner::before{content:'';position:absolute;left:-16px;bottom:-24px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.15);}
-  .ad-title{position:relative;font-size:13px;font-weight:800;}
-  .ad-sub{position:relative;font-size:10px;margin-top:4px;opacity:0.9;}
-  .ad-dots{display:flex;justify-content:center;gap:6px;margin-top:8px;}
-  .ad-dot{width:5px;height:5px;border-radius:50%;background:var(--border);}
-  .ad-dot.active{width:14px;background:var(--maroon);}
+  .ad-banner{margin:14px 16px 0;border-radius:20px;padding:18px 20px;min-height:118px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 8px 24px rgba(122,31,31,0.35);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
+  .ad-banner::before{content:'';position:absolute;left:-20px;bottom:-30px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,0.14);}
+  .ad-banner::after{content:'';position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.08);}
+  .ad-badge{position:relative;align-self:flex-start;background:rgba(255,255,255,0.22);backdrop-filter:blur(2px);color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;margin-bottom:8px;display:flex;align-items:center;gap:4px;}
+  .ad-title{position:relative;font-size:17px;font-weight:900;line-height:1.3;text-shadow:0 1px 3px rgba(0,0,0,0.25);}
+  .ad-sub{position:relative;font-size:12px;margin-top:5px;opacity:0.95;font-weight:600;}
+  .ad-cta{position:relative;display:flex;align-items:center;gap:5px;margin-top:10px;font-size:12px;font-weight:800;color:#fff;}
+  .ad-dots{display:flex;justify-content:center;gap:6px;margin-top:10px;}
+  .ad-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .3s ease;}
+  .ad-dot.active{width:20px;background:var(--maroon);}
+  @keyframes adFadeIn{from{opacity:0;transform:translateY(4px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+  @keyframes adPulse{0%,100%{box-shadow:0 8px 24px rgba(122,31,31,0.35);}50%{box-shadow:0 8px 28px rgba(122,31,31,0.55);}}
   .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px;}
   .cat-tile{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(59,36,23,0.04);}
   .cat-img{width:100%;height:56px;border-radius:12px;object-fit:cover;background:var(--sand);}
@@ -224,9 +229,9 @@
         </div>
       </div>
       <div class="field">
-        <label>كلمة السر</label>
+        <label>الرقم السري</label>
         <div class="input-wrap">
-          <input type="password" id="loginPassword" placeholder="ادخل كلمة السر" dir="ltr" style="text-align:left;">
+          <input type="password" id="loginPassword" placeholder="ادخل الرقم السري" dir="ltr" inputmode="numeric" pattern="[0-9]*" style="text-align:left;">
           <i class="fas fa-lock"></i>
           <i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('loginPassword', this)"></i>
         </div>
@@ -253,12 +258,12 @@
         <div class="input-wrap"><input type="tel" id="regPhone" placeholder="01xxxxxxxxx" dir="ltr" style="text-align:left;" maxlength="11"><i class="fas fa-phone"></i></div>
       </div>
       <div class="field">
-        <label>كلمة السر</label>
-        <div class="input-wrap"><input type="password" id="regPassword" placeholder="6 أرقام/حروف على الأقل" dir="ltr" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPassword', this)"></i></div>
+        <label>الرقم السري</label>
+        <div class="input-wrap"><input type="password" id="regPassword" placeholder="6 أرقام على الأقل" dir="ltr" inputmode="numeric" pattern="[0-9]*" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPassword', this)"></i></div>
       </div>
       <div class="field">
-        <label>تأكيد كلمة السر</label>
-        <div class="input-wrap"><input type="password" id="regPasswordConfirm" placeholder="أعد كتابة كلمة السر" dir="ltr" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPasswordConfirm', this)"></i></div>
+        <label>تأكيد الرقم السري</label>
+        <div class="input-wrap"><input type="password" id="regPasswordConfirm" placeholder="أعد كتابة الرقم السري" dir="ltr" inputmode="numeric" pattern="[0-9]*" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPasswordConfirm', this)"></i></div>
       </div>
       <div class="field"><label>العنوان بالتفصيل</label><textarea class="form-textarea" id="regAddress" rows="2" placeholder="اسم الشارع، أقرب علامة مميزة..."></textarea></div>
       <div class="field">
@@ -682,7 +687,7 @@ async function doLoginScreenSubmit(){
   var phone = document.getElementById('loginPhone').value.trim();
   var password = document.getElementById('loginPassword').value;
   if (phone.length < 10) { showToast('ادخل رقم هاتف صحيح', 'error'); return; }
-  if (!password) { showToast('ادخل كلمة السر', 'error'); return; }
+  if (!password) { showToast('ادخل الرقم السري', 'error'); return; }
   if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
   showLoading(true);
   try {
@@ -690,7 +695,7 @@ async function doLoginScreenSubmit(){
     if (!doc.exists) { showLoading(false); showToast('رقم الهاتف غير مسجل، من فضلك أنشئ حساب جديد', 'error'); return; }
     var data = doc.data();
     var hash = await hashPassword(password);
-    if (hash !== data.passwordHash) { showLoading(false); showToast('رقم الهاتف أو كلمة السر غلط', 'error'); return; }
+    if (hash !== data.passwordHash) { showLoading(false); showToast('رقم الهاتف أو الرقم السري غلط', 'error'); return; }
     isGuest = false;
     customerPhone = phone;
     customerProfile = data.profile || {};
@@ -718,8 +723,9 @@ async function doRegisterAndLogin(){
 
   if (!customerName || !shopName || !addressDetail) { showToast('من فضلك أكمل كل البيانات المطلوبة', 'error'); return; }
   if (phone.length < 10) { showToast('ادخل رقم هاتف صحيح', 'error'); return; }
-  if (password.length < 6) { showToast('كلمة السر لازم تكون 6 حروف/أرقام على الأقل', 'error'); return; }
-  if (password !== passwordConfirm) { showToast('كلمة السر وتأكيدها مش متطابقين', 'error'); return; }
+  if (password.length < 6) { showToast('الرقم السري لازم يكون 6 أرقام على الأقل', 'error'); return; }
+  if (!/^[0-9]+$/.test(password)) { showToast('الرقم السري لازم يكون أرقام فقط', 'error'); return; }
+  if (password !== passwordConfirm) { showToast('الرقم السري وتأكيده مش متطابقين', 'error'); return; }
   if (!neighborhood || !city || !governorate) { showToast('من فضلك اختر الحي والمدينة والمحافظة', 'error'); return; }
   if (!regLocationCoords) { showToast('من فضلك حدد موقعك على الخريطة أولاً', 'error'); return; }
   if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
@@ -878,11 +884,13 @@ function renderAdBanners(){
 function drawAdBanner(){
   var b = appBanners[adIndex];
   var wrap = document.getElementById('adBannerWrap');
-  var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.55), rgba(94,20,20,0.75)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+  var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.62), rgba(94,20,20,0.82)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
                         : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
-  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;" onclick="handleBannerClick(' + adIndex + ')">' +
+  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(' + adIndex + ')">' +
+      '<div class="ad-badge"><i class="fas fa-bolt"></i> عرض خاص</div>' +
       '<div class="ad-title">' + b.title + '</div>' +
       (b.subtitle ? '<div class="ad-sub">' + b.subtitle + '</div>' : '') +
+      '<div class="ad-cta">اضغط للتفاصيل <i class="fas fa-arrow-left"></i></div>' +
       '</button>' +
       '<div class="ad-dots">' + appBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>';
 }
