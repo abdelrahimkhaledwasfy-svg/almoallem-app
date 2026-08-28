@@ -322,7 +322,7 @@
     <div class="section-head"><div class="section-bar"></div><div class="section-title">الأقسام</div></div>
     <div id="categoriesGrid" class="cat-grid"></div>
 
-    <div class="section-head"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">الأكثر طلبًا</div></div>
+    <div class="section-head" id="bestSellersHead"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">الأكثر طلبًا</div></div>
     <div id="bestSellersRow" class="prod-row"></div>
   </div>
 
@@ -884,8 +884,12 @@ function renderHome(){
     }).join('');
   }
   var bestRow = document.getElementById('bestSellersRow');
-  var best = inStockOnly(products).slice(0, 8);
-  bestRow.innerHTML = best.length ? best.map(function(p){return productCardHtml(p);}).join('') : '<div class="empty-note">لسه مفيش أصناف مضافة</div>';
+  // شريط "الأكثر طلبًا" بقى بيتحكم فيه المعلم يدويًا من لوحة التحكم (فلاج bestSeller على كل صنف)
+  // بدل ما كان بياخد أول 8 أصناف عشوائيًا من غير أي معنى حقيقي
+  var best = inStockOnly(products).filter(function(p){ return p.bestSeller; })
+              .sort(function(a,b){ return (a.bestSellerOrder||0) - (b.bestSellerOrder||0); });
+  document.getElementById('bestSellersHead').style.display = best.length ? 'flex' : 'none';
+  bestRow.innerHTML = best.map(function(p){return productCardHtml(p);}).join('');
 }
 
 function renderAdBanners(){
