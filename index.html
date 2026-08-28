@@ -8,6 +8,8 @@
 <meta name="theme-color" content="#7A1F1F">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- OneSignal: إشعارات فورية (Push Notifications) للعملاء حتى لو الأبليكشن قافل -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -265,6 +267,10 @@
         <label>تأكيد الرقم السري</label>
         <div class="input-wrap"><input type="password" id="regPasswordConfirm" placeholder="أعد كتابة الرقم السري" dir="ltr" inputmode="numeric" pattern="[0-9]*" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPasswordConfirm', this)"></i></div>
       </div>
+      <div class="field" id="regActivationCodeField" style="display:none;">
+        <label>كود التفعيل</label>
+        <div class="input-wrap"><input id="regActivationCode" placeholder="الكود اللي وصلك من المعلم" dir="ltr" style="text-align:left;text-transform:uppercase;"><i class="fas fa-key"></i></div>
+      </div>
       <div class="field"><label>العنوان بالتفصيل</label><textarea class="form-textarea" id="regAddress" rows="2" placeholder="اسم الشارع، أقرب علامة مميزة..."></textarea></div>
       <div class="field">
         <label>تحديد الموقع (اللوكيشن)</label>
@@ -513,6 +519,26 @@ const firebaseConfig = {
 };
 let db = null;
 
+// ⚠️ حط هنا الـ App ID بتاعك من OneSignal (Settings > Keys & IDs)
+const ONESIGNAL_APP_ID = "bd9f1359-0a6b-4dba-8a72-7401da5b809a";
+
+// بنربط جهاز/متصفح العميل برقم هاتفه (External ID) عشان لوحة التحكم تقدر تبعتله إشعار محدد بالاسم
+// من غير ما تبعت لكل العملاء. بيتنادى بعد تسجيل الدخول/التسجيل، وكمان لو العميل داخل من جهاز سجل عليه قبل كده.
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+function initOneSignalForCustomer(){
+  if (!customerPhone || isGuest) return; // مفيش تسجيل خارجي للزوار، مالهمش رقم ثابت نبعتلهم عليه
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try {
+      await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true });
+      await OneSignal.login(customerPhone);
+      // بنسأل الإذن بعد شوية من دخول العميل، مش فورًا وقت فتح الأبليكشن، عشان ميبقاش أول حاجة تقابله
+      setTimeout(function(){
+        OneSignal.Notifications.requestPermission().catch(function(e){ console.error('OneSignal permission error:', e); });
+      }, 4000);
+    } catch(e) { console.error('OneSignal init error:', e); }
+  });
+}
+
 function getStorage(key, fallback){
   try { var d = localStorage.getItem(key); return d ? JSON.parse(d) : fallback; }
   catch(e){ return fallback; }
@@ -543,6 +569,8 @@ let adIndex = 0, adTimer = null;
 let deliveryTime = 'morning';
 let loyaltySettings = JSON.parse(localStorage.getItem('loyaltySettings') || 'null') || { pointsPerAmount: 10, pointValue: 1 };
 let redeemPointsChecked = false;
+let requireActivationCode = JSON.parse(localStorage.getItem('requireActivationCode') || 'false');
+let activationCodes = JSON.parse(localStorage.getItem('activationCodes') || '[]');
 let currentRatingOrderId = null, currentRatingStars = 5;
 let regLocationCoords = null;
 let isGuest = localStorage.getItem('app_guest_mode') === '1';
@@ -607,6 +635,8 @@ function applyStoreData(data){
   stockLevels = {};
   for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
   loyaltySettings = data.loyaltySettings || loyaltySettings;
+  requireActivationCode = !!data.requireActivationCode;
+  activationCodes = data.activationCodes || [];
   // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
   setStorage('products', data.products || []);
   setStorage('appCategories', data.appCategories || []);
@@ -616,6 +646,8 @@ function applyStoreData(data){
   setStorage('inventory', inv);
   setStorage('customers', data.customers || []);
   localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
+  localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
+  localStorage.setItem('activationCodes', JSON.stringify(activationCodes));
   loadLoyaltyPoints();
 }
 
@@ -644,6 +676,8 @@ function loadStoreDataFromLocalCache(){
   var inv = getStorage('inventory', {});
   stockLevels = {};
   for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
+  requireActivationCode = getStorage('requireActivationCode', false);
+  activationCodes = getStorage('activationCodes', []);
 }
 
 // ==================== تسجيل الدخول / إنشاء حساب / وضع الزائر ====================
@@ -675,6 +709,7 @@ populateRegDropdowns();
 function showRegisterScreen(){
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('registerScreen').classList.add('active');
+  document.getElementById('regActivationCodeField').style.display = requireActivationCode ? 'block' : 'none';
 }
 function showLoginScreenFromRegister(){
   document.getElementById('registerScreen').classList.remove('active');
@@ -722,6 +757,7 @@ async function doRegisterAndLogin(){
   var phone = document.getElementById('regPhone').value.trim();
   var password = document.getElementById('regPassword').value;
   var passwordConfirm = document.getElementById('regPasswordConfirm').value;
+  var activationCodeInput = document.getElementById('regActivationCode').value.trim().toUpperCase();
   var addressDetail = document.getElementById('regAddress').value.trim();
   var neighborhood = document.getElementById('regNeighborhood').value;
   var city = document.getElementById('regCity').value;
@@ -736,6 +772,15 @@ async function doRegisterAndLogin(){
   if (!regLocationCoords) { showToast('من فضلك حدد موقعك على الخريطة أولاً', 'error'); return; }
   if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
 
+  var matchedCode = null;
+  if (requireActivationCode) {
+    if (!activationCodeInput) { showToast('من فضلك ادخل كود التفعيل اللي وصلك من المعلم', 'error'); return; }
+    matchedCode = activationCodes.find(function(c){ return c.code === activationCodeInput; });
+    if (!matchedCode) { showToast('كود التفعيل غير صحيح', 'error'); return; }
+    if (matchedCode.used) { showToast('كود التفعيل ده مستخدم بالفعل', 'error'); return; }
+    if (matchedCode.forPhone && matchedCode.forPhone !== phone) { showToast('الكود ده مخصص لرقم هاتف تاني', 'error'); return; }
+  }
+
   showLoading(true);
   try {
     var existing = await db.collection('appCustomers').doc(phone).get();
@@ -743,6 +788,12 @@ async function doRegisterAndLogin(){
     var passwordHash = await hashPassword(password);
     var profile = { customerName: customerName, shopName: shopName, addressDetail: addressDetail, neighborhood: neighborhood, city: city, governorate: governorate, location: regLocationCoords };
     await db.collection('appCustomers').doc(phone).set({ phone: phone, passwordHash: passwordHash, profile: profile, createdAt: Date.now() });
+    if (matchedCode) {
+      // بنسجل استخدام الكود في كوليكشن صغيرة منفصلة (مش هنكتب في بيانات المتجر مباشرة من الأبليكشن حفاظًا على الأمان)
+      await db.collection('activationCodeUses').add({ code: matchedCode.code, usedBy: phone, usedAt: Date.now() });
+      matchedCode.used = true; matchedCode.usedBy = phone; matchedCode.usedAt = Date.now();
+      setStorage('activationCodes', activationCodes);
+    }
     isGuest = false;
     customerPhone = phone;
     customerProfile = profile;
@@ -774,6 +825,7 @@ function captureLocation(){
 
 function doLogout(){
   if (!confirm('تسجيل الخروج؟')) return;
+  window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); });
   localStorage.removeItem('app_customer_phone');
   localStorage.removeItem('app_customer_profile');
   localStorage.removeItem('app_guest_mode');
@@ -805,6 +857,7 @@ function startApp(){
   renderAdBanners();
   showLoading(false);
   initCloud();
+  initOneSignalForCustomer();
 }
 
 function listenMyOrders(){
