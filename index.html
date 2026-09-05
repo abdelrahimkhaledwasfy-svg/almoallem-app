@@ -1094,16 +1094,18 @@ function renderOffers(){
     } else if (!inCartPrimary) {
       actionHtml = '<button style="font-size:10px;font-weight:800;padding:8px 14px;border-radius:12px;background:var(--maroon);color:var(--cream);flex-shrink:0;" onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,1)"><i class="fas fa-cart-plus"></i> ضيف للسلة</button>';
     } else {
-      actionHtml = '<div class="pcard-stepper" style="flex-shrink:0;">' +
+      actionHtml = '<div class="cart-stepper" style="flex-shrink:0;">' +
           '<button onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry.qty - 1) + ')"><i class="fas fa-minus"></i></button>' +
-          '<span class="qty">' + entry.qty + '</span>' +
+          '<span style="font-weight:800;font-size:11px;color:var(--maroon);">' + entry.qty + '</span>' +
           '<button onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry.qty + 1) + ')"><i class="fas fa-plus"></i></button></div>';
     }
+    var imgHtml = p && p.imageUrl ? '<img src="' + p.imageUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">' : '<i class="fas fa-box-open"></i>';
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:12px;display:flex;gap:10px;align-items:center;margin-bottom:10px;">' +
-        '<div style="width:56px;height:56px;border-radius:14px;background:var(--sand);display:flex;align-items:center;justify-content:center;color:var(--maroon);font-size:20px;flex-shrink:0;">' +
-        '<i class="fas fa-tag"></i></div>' +
+        '<div style="width:56px;height:56px;border-radius:14px;background:var(--sand);display:flex;align-items:center;justify-content:center;color:var(--maroon);font-size:20px;flex-shrink:0;overflow:hidden;">' +
+        imgHtml + '</div>' +
         '<div style="flex:1;min-width:0;">' +
-        '<div style="font-size:11.5px;font-weight:800;">' + o.title + '</div>' +
+        '<div style="font-size:11.5px;font-weight:800;">' + (p ? p.name : (o.productName || o.title)) + '</div>' +
+        (p && o.title ? '<div style="font-size:9.5px;color:var(--maroon);font-weight:700;margin-top:2px;"><i class="fas fa-tag"></i> ' + o.title + '</div>' : '') +
         (o.desc ? '<div style="font-size:9.5px;color:var(--muted);margin-top:2px;">' + o.desc + '</div>' : '') +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;">' +
         (discount > 0 ? '<span style="font-size:9.5px;text-decoration:line-through;color:#B7A88E;">' + money(o.oldPrice) + '</span>' : '') +
