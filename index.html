@@ -111,6 +111,8 @@
   .pcard-body{padding:16px 10px 10px;}
   .pcard-price{font-size:15px;font-weight:900;}
   .pcard-price .cur{font-size:9px;font-weight:700;color:var(--muted);margin-right:2px;}
+  .pcard-price{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;}
+  .pcard-oldprice{font-size:10.5px;font-weight:700;color:var(--danger);text-decoration:line-through;order:-1;flex-basis:100%;}
   .pcard-unit{font-size:9px;color:#B7935F;font-weight:700;margin-bottom:4px;}
   .pcard-name{font-size:10.5px;font-weight:700;line-height:1.4;color:#5B4432;}
   .pcard-units{display:flex;gap:4px;margin-top:8px;}
@@ -1082,6 +1084,21 @@ function renderOffers(){
   wrap.innerHTML = appOffers.map(function(o){
     var p = products.find(function(x){return x.code === o.productCode;});
     var discount = o.oldPrice > 0 ? Math.round((1 - o.newPrice/o.oldPrice)*100) : 0;
+    var entry = p ? cart[p.code] : null;
+    var inCartPrimary = entry && entry.unit === 'primary' && entry.qty > 0;
+    var actionHtml;
+    if (!p) {
+      actionHtml = '';
+    } else if (isGuest) {
+      actionHtml = '<button style="font-size:10px;font-weight:800;padding:8px 14px;border-radius:12px;background:var(--maroon);color:var(--cream);flex-shrink:0;" onclick="promptGuestLogin()">اطلب</button>';
+    } else if (!inCartPrimary) {
+      actionHtml = '<button style="font-size:10px;font-weight:800;padding:8px 14px;border-radius:12px;background:var(--maroon);color:var(--cream);flex-shrink:0;" onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,1)"><i class="fas fa-cart-plus"></i> ضيف للسلة</button>';
+    } else {
+      actionHtml = '<div class="pcard-stepper" style="flex-shrink:0;">' +
+          '<button onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry.qty - 1) + ')"><i class="fas fa-minus"></i></button>' +
+          '<span class="qty">' + entry.qty + '</span>' +
+          '<button onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry.qty + 1) + ')"><i class="fas fa-plus"></i></button></div>';
+    }
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:12px;display:flex;gap:10px;align-items:center;margin-bottom:10px;">' +
         '<div style="width:56px;height:56px;border-radius:14px;background:var(--sand);display:flex;align-items:center;justify-content:center;color:var(--maroon);font-size:20px;flex-shrink:0;">' +
         '<i class="fas fa-tag"></i></div>' +
@@ -1091,14 +1108,25 @@ function renderOffers(){
         '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;">' +
         (discount > 0 ? '<span style="font-size:9.5px;text-decoration:line-through;color:#B7A88E;">' + money(o.oldPrice) + '</span>' : '') +
         '<span style="font-size:13px;font-weight:900;color:var(--maroon);">' + money(o.newPrice) + ' ج.م</span></div></div>' +
-        '<button style="font-size:10px;font-weight:800;padding:8px 14px;border-radius:12px;background:var(--maroon);color:var(--cream);flex-shrink:0;"' +
-        (p ? ' onclick="openCategoryFromOffer(&#39;' + (p.category || '').replace(/&#39;/g, "\&#39;") + '&#39;)"' : '') + '>اطلب</button></div>';
+        actionHtml + '</div>';
   }).join('');
 }
 
 function openCategoryFromOffer(categoryName){
   var cat = appCategories.find(function(c){return c.name === categoryName;});
   if (cat) openCategory(cat.id); else switchScreen('search');
+}
+
+function getActiveOffer(code){
+  return appOffers.find(function(o){ return o.productCode === code; }) || null;
+}
+function getUnitPrice(p, unit){
+  var isSecondary = unit === 'secondary';
+  if (!isSecondary){
+    var offer = getActiveOffer(p.code);
+    if (offer) return offer.newPrice;
+  }
+  return isSecondary ? (p.secondaryUnit ? p.secondaryUnit.price : p.price) : p.price;
 }
 
 function productCardHtml(p){
@@ -1108,7 +1136,8 @@ function productCardHtml(p){
   var entry = cart[p.code];
   var isSecondary = entry && entry.unit === 'secondary';
   var unitLabel = isSecondary ? (p.secondaryUnit ? p.secondaryUnit.name : p.unit) : p.unit;
-  var unitPrice = isSecondary ? (p.secondaryUnit ? p.secondaryUnit.price : p.price) : p.price;
+  var unitPrice = getUnitPrice(p, isSecondary ? 'secondary' : 'primary');
+  var activeOffer = !isSecondary ? getActiveOffer(p.code) : null;
   var isFav = favorites.includes(p.code);
   var imgHtml = p.imageUrl ? '<img src="' + p.imageUrl + '" class="pcard-img">' : '<div class="pcard-img-fallback"><i class="fas fa-box-open"></i></div>';
 
@@ -1142,10 +1171,10 @@ function productCardHtml(p){
   return '<div class="pcard ' + (oos ? 'oos' : '') + '">' +
       '<button class="pcard-fav ' + (isFav ? 'active' : '') + '" onclick="toggleFavorite(&#39;' + p.code + '&#39;)"><i class="fa' + (isFav ? 's' : 'r') + ' fa-star"></i></button>' +
       '<div class="pcard-img-wrap">' + imgHtml +
-      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : '')) +
+      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : (activeOffer ? '<div class="pcard-badge" style="background:var(--maroon);color:#fff;">عرض</div>' : ''))) +
       stepperHtml + '</div>' +
       '<div class="pcard-body">' +
-      '<div class="pcard-price">' + money(unitPrice) + '<span class="cur">ج.م</span></div>' +
+      '<div class="pcard-price">' + (activeOffer ? ('<span class="pcard-oldprice">' + money(activeOffer.oldPrice) + ' ج.م</span>') : '') + money(unitPrice) + '<span class="cur">ج.م</span></div>' +
       '<div class="pcard-unit">لكل ' + unitLabel + '</div>' +
       '<div class="pcard-name">' + p.name + '</div>' + unitsHtml + '</div></div>';
 }
@@ -1166,6 +1195,7 @@ function addToCart(code, unit, qty){
   if (document.getElementById('searchScreen').classList.contains('active')) renderSearchResults();
   if (document.getElementById('favoritesScreen').classList.contains('active')) renderFavorites();
   if (document.getElementById('cartScreen').classList.contains('active')) renderCart();
+  if (document.getElementById('offersScreen').classList.contains('active')) renderOffers();
 }
 
 function updateCartBadge(){
@@ -1180,7 +1210,7 @@ function getCartLineItems(){
     var p = products.find(function(x){return x.code === code;});
     if (!p) return null;
     var isSecondary = entry.unit === 'secondary';
-    var unitPrice = isSecondary ? (p.secondaryUnit ? p.secondaryUnit.price : p.price) : p.price;
+    var unitPrice = getUnitPrice(p, entry.unit);
     var unitLabel = isSecondary ? (p.secondaryUnit ? p.secondaryUnit.name : p.unit) : p.unit;
     return { product: p, entry: entry, unitPrice: unitPrice, unitLabel: unitLabel, lineTotal: unitPrice * entry.qty };
   }).filter(Boolean);
