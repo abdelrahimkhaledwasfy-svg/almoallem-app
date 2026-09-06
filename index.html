@@ -3900,7 +3900,7 @@
         // تسوية يدوية لرصيد مورد (متاحة للمدير بس): بتحسب الفرق بين الرصيد الحالي المحسوب والرصيد
         // الصحيح اللي المدير كاتبه، وبتسجله كحركة تسوية منفصلة بدل ما تلمس أي فاتورة أو سند قديم
         function openSupplierAdjustmentModal(supplierCode) {
-            if (!currentUser || currentUser.role !== 'admin') { showToast('تعديل إجمالي مديونية المورد متاح للمدير فقط', 'error'); return; }
+            if (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin') { showToast('تعديل إجمالي مديونية المورد متاح للمدير فقط', 'error'); return; }
             const supplier = suppliers.find(s => s.code === supplierCode);
             if (!supplier) return;
             const current = getSupplierBalance(supplierCode);
@@ -3913,7 +3913,7 @@
         }
 
         function saveSupplierAdjustment() {
-            if (!currentUser || currentUser.role !== 'admin') { showToast('تعديل إجمالي مديونية المورد متاح للمدير فقط', 'error'); return; }
+            if (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin') { showToast('تعديل إجمالي مديونية المورد متاح للمدير فقط', 'error'); return; }
             const code = document.getElementById('supplierAdjustmentCode').value;
             const newBalance = parseFloat(document.getElementById('supplierAdjustmentNew').value);
             const notes = document.getElementById('supplierAdjustmentNotes').value.trim();
@@ -5402,7 +5402,7 @@
                 return `<tr><td><span class="badge badge-orange">${s.code}</span></td><td><strong>${s.name}</strong></td><td>${s.phone || '-'}</td><td>${s.address || '-'}</td>
                 <td><span class="customer-balance ${balanceClass}">${balanceText}</span></td>
                 <td><button class="btn btn-primary btn-icon btn-sm" onclick='openSupplierModal(${JSON.stringify(s).replace(/'/g, "&#39;")})'><i class="fas fa-edit"></i></button>
-                ${currentUser && currentUser.role === 'admin' ? `<button class="btn btn-secondary btn-icon btn-sm" title="تعديل إجمالي المديونية" onclick="openSupplierAdjustmentModal('${s.code}')"><i class="fas fa-balance-scale"></i></button>` : ''}
+                ${currentUser && String(currentUser.role || '').trim().toLowerCase() === 'admin' ? `<button class="btn btn-secondary btn-icon btn-sm" title="تعديل إجمالي المديونية" onclick="openSupplierAdjustmentModal('${s.code}')"><i class="fas fa-balance-scale"></i></button>` : ''}
                 <button class="btn btn-danger btn-icon btn-sm" onclick="deleteSupplier('${s.code}')"><i class="fas fa-trash"></i></button></td></tr>`;
             }).join('');
             updateSupplierStatementSelect();
@@ -5764,7 +5764,7 @@
 
         function deleteTreasuryEntry(id) {
             const entryCheck = treasury.find(t => t.id === id);
-            if (entryCheck && entryCheck.partyType === 'supplier' && (!currentUser || currentUser.role !== 'admin')) {
+            if (entryCheck && entryCheck.partyType === 'supplier' && (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin')) {
                 showToast('حذف سندات الصرف للموردين متاح للمدير فقط', 'error');
                 return;
             }
@@ -5783,7 +5783,7 @@
         function undoLastTreasuryEntry() {
             if (treasury.length === 0) { showToast('لا توجد حركات لإلغائها', 'error'); return; }
             const last = treasury.slice().sort((a, b) => b.id - a.id)[0];
-            if (last.partyType === 'supplier' && (!currentUser || currentUser.role !== 'admin')) {
+            if (last.partyType === 'supplier' && (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin')) {
                 showToast('التراجع عن سندات الصرف للموردين متاح للمدير فقط', 'error');
                 return;
             }
@@ -6245,7 +6245,7 @@
         function deleteAnyInvoice(id, type) {
             if (type === 'purchase') {
                 const invCheck = purchaseInvoices.find(i => i.id === id);
-                if (invCheck && invCheck.paymentMethod === 'آجل' && (!currentUser || currentUser.role !== 'admin')) {
+                if (invCheck && invCheck.paymentMethod === 'آجل' && (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin')) {
                     showToast('حذف فواتير الشراء الآجلة متاح للمدير فقط', 'error');
                     return;
                 }
@@ -6296,7 +6296,7 @@
         function openEditInvoiceModal(id, type) {
             const invoice = type === 'sale' ? invoices.find(i => i.id === id) : purchaseInvoices.find(i => i.id === id);
             if (!invoice) return;
-            if (type === 'purchase' && invoice.paymentMethod === 'آجل' && (!currentUser || currentUser.role !== 'admin')) {
+            if (type === 'purchase' && invoice.paymentMethod === 'آجل' && (!currentUser || String(currentUser.role || '').trim().toLowerCase() !== 'admin')) {
                 showToast('تعديل فواتير الشراء الآجلة متاح للمدير فقط', 'error');
                 return;
             }
