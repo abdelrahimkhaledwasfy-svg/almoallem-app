@@ -334,6 +334,9 @@
       <a class="action-btn" href="https://chat.whatsapp.com/LGpJY9nsxKxDkMPmnVmxiy?s=cl&p=a&mlu=4" target="_blank" rel="noopener" style="text-decoration:none;background:#25D366;color:#fff;"><i class="fab fa-whatsapp"></i> جروب عملاء المعلم</a>
     </div>
 
+    <div class="section-head" id="offersStripHead"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">عروض حصرية</div></div>
+    <div id="offersStripRow" class="prod-row"></div>
+
     <div class="section-head"><div class="section-bar"></div><div class="section-title">الأقسام</div></div>
     <div id="categoriesGrid" class="cat-grid"></div>
 
@@ -947,6 +950,17 @@ function categoryIconHtml(cat){
   return '<div class="cat-icon"><i class="fas fa-box"></i></div>';
 }
 function renderHome(){
+  var offersRow = document.getElementById('offersStripRow');
+  // شريط "عروض حصرية" بيظهر بس لو فيه عروض فعّالة حاليًا (نفس منطق شاشة العروض بالظبط)
+  var offerProducts = appOffers
+    .map(function(o){ return products.find(function(x){ return x.code === o.productCode; }); })
+    .filter(Boolean);
+  var seenOffer = {};
+  offerProducts = offerProducts.filter(function(p){ if (seenOffer[p.code]) return false; seenOffer[p.code] = true; return true; });
+  offerProducts = inStockOnly(offerProducts);
+  document.getElementById('offersStripHead').style.display = offerProducts.length ? 'flex' : 'none';
+  offersRow.innerHTML = offerProducts.map(function(p){return productCardHtml(p);}).join('');
+
   var grid = document.getElementById('categoriesGrid');
   if (appCategories.length === 0){
     grid.innerHTML = '<div class="empty-note" style="grid-column:1/-1;">لسه مفيش أقسام مضافة من المعلم</div>';
