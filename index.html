@@ -558,7 +558,14 @@ function initOneSignalForCustomer(){
   if (!customerPhone || isGuest) return; // مفيش تسجيل خارجي للزوار، مالهمش رقم ثابت نبعتلهم عليه
   window.OneSignalDeferred.push(async function(OneSignal){
     try {
-      await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true });
+      // الأبليكشن مش على جذر الدومين (هو جوه مجلد /almoallem-app/)، فلازم نحدد لـ OneSignal
+      // بالظبط فين ملف الـ Service Worker ونطاق عمله، وإلا هيدور عليه في الجذر ويلاقي 404
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: 'almoallem-app/OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/almoallem-app/' }
+      });
       await OneSignal.login(customerPhone);
       // بنسأل الإذن بعد شوية من دخول العميل، مش فورًا وقت فتح الأبليكشن، عشان ميبقاش أول حاجة تقابله
       setTimeout(function(){
