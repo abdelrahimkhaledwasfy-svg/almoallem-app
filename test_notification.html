@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>اختبار إرسال الإشعارات</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;background:#f5f0e8;padding:20px;color:#3a2a1a;max-width:600px;margin:0 auto;}
+  h1{color:#7a1f1f;font-size:20px;}
+  button{background:#7a1f1f;color:#fff;border:none;border-radius:8px;padding:16px 20px;font-size:17px;cursor:pointer;margin:8px 0;width:100%;}
+  .box{background:#fff;border-radius:12px;padding:18px;margin:12px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-size:16px;line-height:1.6;}
+  .warn{color:#c0392b;font-weight:bold;}
+  .ok{color:#1e8449;font-weight:bold;}
+</style>
+</head>
+<body>
+<h1>🔔 اختبار الإشعارات</h1>
+<div class="box">دوس الزرار ده وهيبعت إشعار تجريبي وهيقولك المشكلة إيه بالظبط لو فيه حاجة غلط.</div>
+<button onclick="test()">ابعت إشعار تجريبي دلوقتي</button>
+<div class="box" id="result">جاهز...</div>
+
+<script>
+const PROXY_URL = "https://noisy-glitter-c1b3.abdelrahimkhaledwasfy.workers.dev";
+
+async function test(){
+  const result = document.getElementById('result');
+  result.innerHTML = 'جاري الإرسال...';
+  try {
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetPhone: 'all', title: 'رسالة تجربة', message: 'هذه رسالة تجريبية من أداة الفحص' })
+    });
+    const data = await res.json();
+
+    if (data.errors) {
+      let explanation = 'فيه رفض من OneSignal نفسه: ' + JSON.stringify(data.errors);
+      const errText = JSON.stringify(data.errors);
+      if (errText.includes('All included players are not subscribed')) {
+        explanation = 'مفيش ولا عميل واحد موافق على الإشعارات لحد دلوقتي، فمفيش حد نبعتله. لازم عميل يفتح الأبليكشن الجديد ويوافق على الإذن الأول.';
+      } else if (errText.includes('Invalid app_id') || errText.includes('app_id')) {
+        explanation = 'رقم التطبيق (App ID) المسجل غلط أو مش مطابق لحسابك في OneSignal.';
+      } else if (errText.toLowerCase().includes('unauthorized') || errText.includes('401') || errText.includes('403')) {
+        explanation = 'مفتاح الدخول (REST API Key) غلط أو صلاحياته لسه ناقصة من لوحة تحكم OneSignal.';
+      }
+      result.innerHTML = `<p class="warn">${explanation}</p><p style="font-size:12px;color:#888;">(تفاصيل تقنية: ${errText})</p>`;
+    } else if (data.id) {
+      result.innerHTML = `<p class="ok">تم الإرسال بنجاح ✓ (رقم الإشعار: ${data.id})</p><p>لو محدش استقبل حاجة على موبايله، يبقى المشكلة إن محدش وافق على الإذن لسه، مش مشكلة في الإرسال نفسه.</p>`;
+    } else {
+      result.innerHTML = `<p class="warn">رد غريب من الخادم، مش متأكدين من السبب.</p><pre style="direction:ltr;text-align:left;font-size:12px;">${JSON.stringify(data, null, 2)}</pre>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<p class="warn">تعذر الوصول للوسيط نفسه (${e.message}). جرب تتأكد إن الرابط اللي في الكود مطابق للرابط اللي ظهرلك في Cloudflare، أو جرب من إنترنت تاني.</p>`;
+  }
+}
+</script>
+</body>
+</html>
