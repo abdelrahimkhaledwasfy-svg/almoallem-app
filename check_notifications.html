@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>فحص إعدادات الإشعارات - OneSignal</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;background:#f5f0e8;padding:20px;color:#3a2a1a;max-width:700px;margin:0 auto;}
+  h1{color:#7a1f1f;font-size:20px;}
+  button{background:#7a1f1f;color:#fff;border:none;border-radius:8px;padding:14px 20px;font-size:16px;cursor:pointer;margin:8px 0;width:100%;}
+  .box{background:#fff;border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+  .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;}
+  .warn{color:#c0392b;font-weight:bold;}
+  .ok{color:#1e8449;font-weight:bold;}
+  pre{white-space:pre-wrap;font-size:12px;background:#f8f8f8;padding:10px;border-radius:8px;max-height:300px;overflow:auto;direction:ltr;text-align:left;}
+</style>
+</head>
+<body>
+<h1>🔔 فحص إعدادات الإشعارات (OneSignal)</h1>
+<div class="box">
+  <p>الأداة دي بس بتقرا إعدادات حسابك في OneSignal وتوريهالك هنا، مفيهاش أي تعديل أو إرسال فعلي لأي حد.</p>
+  <button onclick="checkConfig()">افحص الإعدادات دلوقتي</button>
+</div>
+<div class="box" id="result">
+  <p>لسه ما فحصناش...</p>
+</div>
+<div class="box">
+  <pre id="log"></pre>
+</div>
+
+<script>
+const APP_ID = "bd9f1359-0a6b-4dba-8a72-7401da5b809a";
+const REST_API_KEY = "os_v2_app_xwprgwiknng3vctsoqa5uw4atlrwmyshbv3eo25mck6vd5rsf3tqbvjiugzse5yymqkdegxfzh6b7uffp7d5xxxpj5n527tfrivg4ei";
+
+async function checkConfig(){
+  const result = document.getElementById('result');
+  const log = document.getElementById('log');
+  result.innerHTML = '<p>جاري الفحص...</p>';
+  log.textContent = '';
+  try {
+    const res = await fetch('https://api.onesignal.com/apps/' + APP_ID, {
+      headers: { 'Authorization': 'Key ' + REST_API_KEY }
+    });
+    const data = await res.json();
+    log.textContent = JSON.stringify(data, null, 2);
+
+    if (!res.ok) {
+      result.innerHTML = `<p class="warn">فيه مشكلة في الاتصال بحساب OneSignal (كود الخطأ: ${res.status}). ممكن الـ App ID أو الـ REST API Key اللي في الكود غلط أو اتغيّر من لوحة التحكم.</p>`;
+      return;
+    }
+
+    let html = '';
+    html += `<div class="row"><span>اسم التطبيق في OneSignal</span><span>${data.name || '-'}</span></div>`;
+    const subscribed = data.players !== undefined ? data.players : (data.messageable_players !== undefined ? data.messageable_players : '-');
+    html += `<div class="row"><span>عدد الأجهزة المشتركة حاليًا (وافقت على الإشعارات)</span><span class="${subscribed>0?'ok':'warn'}">${subscribed}</span></div>`;
+    const chromeConfigured = !!(data.chrome_web_origin || data.chrome_web_gcm_sender_id);
+    html += `<div class="row"><span>منصة الويب (Chrome/الموقع) متظبطة</span><span class="${chromeConfigured?'ok':'warn'}">${chromeConfigured ? 'مظبوطة ✓' : 'مش مظبوطة ✗'}</span></div>`;
+    if (data.chrome_web_origin) {
+      html += `<div class="row"><span>رابط الموقع المسجل في OneSignal</span><span>${data.chrome_web_origin}</span></div>`;
+    }
+    result.innerHTML = html;
+
+    if (subscribed === 0 || subscribed === '-') {
+      result.innerHTML += `<p class="warn" style="margin-top:10px;">مفيش ولا جهاز عميل مشترك في الإشعارات لحد دلوقتي. يعني لسه محدش وافق على الإذن من الأبليكشن — لازم عميل يفتح الأبليكشن الجديد ويوافق لما يسأله الإذن.</p>`;
+    }
+    if (data.chrome_web_origin) {
+      result.innerHTML += `<p style="margin-top:10px;">تأكد إن الرابط ده (<strong>${data.chrome_web_origin}</strong>) هو نفسه بالظبط رابط الأبليكشن اللي عملاؤك بيفتحوه. لو مختلف، ده سبب إن الإشعارات مش هتوصل.</p>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<p class="warn">تعذر الاتصال بـ OneSignal من هنا: ${e.message}. ده ممكن يكون بسبب حجب من المتصفح (جرب من جهاز/متصفح تاني)، أو مشكلة في الإنترنت.</p>`;
+  }
+}
+</script>
+</body>
+</html>
