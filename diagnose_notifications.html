@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تشخيص الاشتراك في الإشعارات</title>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif;background:#f5f0e8;padding:20px;color:#3a2a1a;max-width:600px;margin:0 auto;}
+  h1{color:#7a1f1f;font-size:20px;}
+  .box{background:#fff;border-radius:12px;padding:16px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-size:15px;}
+  .step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #eee;}
+  .icon{font-size:18px;width:24px;flex-shrink:0;}
+  .pending .icon::before{content:"⏳";}
+  .ok .icon::before{content:"✅";}
+  .fail .icon::before{content:"❌";}
+  button{background:#7a1f1f;color:#fff;border:none;border-radius:8px;padding:16px 20px;font-size:17px;cursor:pointer;margin:10px 0;width:100%;}
+</style>
+</head>
+<body>
+<h1>🔍 تشخيص الاشتراك في الإشعارات</h1>
+<div class="box">دوس الزرار وسيب الصفحة شوية عشان تتابع كل خطوة، هتعرف بالظبط فين المشكلة.</div>
+<button onclick="runDiagnosis()">ابدأ التشخيص</button>
+<div class="box" id="steps"></div>
+
+<script>
+const APP_ID = "bd9f1359-0a6b-4dba-8a72-7401da5b809a";
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+function addStep(id, label){
+  const div = document.createElement('div');
+  div.className = 'step pending';
+  div.id = 'step-' + id;
+  div.innerHTML = `<div class="icon"></div><div>${label}</div>`;
+  document.getElementById('steps').appendChild(div);
+}
+function setStep(id, ok, extra){
+  const div = document.getElementById('step-' + id);
+  div.className = 'step ' + (ok ? 'ok' : 'fail');
+  if (extra) div.innerHTML += `<div style="font-size:12px;color:#888;margin-top:4px;">${extra}</div>`;
+}
+
+async function runDiagnosis(){
+  document.getElementById('steps').innerHTML = '';
+  addStep('sdk', 'تحميل مكتبة OneSignal في الصفحة');
+  addStep('sw', 'وجود ملف الـ Service Worker (OneSignalSDKWorker.js)');
+  addStep('init', 'تهيئة (Init) الاتصال بحسابك في OneSignal');
+  addStep('perm', 'حالة إذن الإشعارات في المتصفح');
+  addStep('push', 'إنشاء اشتراك دفع فعلي (Push Subscription)');
+  addStep('id', 'رقم الاشتراك النهائي');
+
+  // 1) هل ملف السيرفس ووركر موجود ومتاح فعلاً؟
+  try {
+    const swRes = await fetch('OneSignalSDKWorker.js');
+    if (swRes.ok) setStep('sw', true);
+    else setStep('sw', false, 'كود الرد: ' + swRes.status);
+  } catch(e) { setStep('sw', false, e.message); }
+
+  // 2) هل مكتبة OneSignal اتحملت؟
+  let waited = 0;
+  while (typeof window.OneSignal === 'undefined' && waited < 8000) {
+    await new Promise(r => setTimeout(r, 200));
+    waited += 200;
+  }
+  if (typeof window.OneSignal === 'undefined') {
+    setStep('sdk', false, 'المكتبة ما اتحمّلتش خالص بعد 8 ثواني — ممكن يكون فيه حاجب إعلانات أو مشكلة إنترنت');
+    return;
+  }
+  setStep('sdk', true);
+
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try {
+      await OneSignal.init({ appId: APP_ID, allowLocalhostAsSecureOrigin: true });
+      setStep('init', true);
+    } catch(e) {
+      setStep('init', false, e.message || String(e));
+      return;
+    }
+
+    try {
+      const permission = OneSignal.Notifications.permission;
+      setStep('perm', permission === true, 'الحالة: ' + permission);
+      if (permission !== true) {
+        await OneSignal.Notifications.requestPermission();
+      }
+    } catch(e) {
+      setStep('perm', false, e.message || String(e));
+    }
+
+    // ننتظر شوية عشان الاشتراك ياخد وقته يتسجل
+    await new Promise(r => setTimeout(r, 2000));
+
+    try {
+      const pushSub = OneSignal.User.PushSubscription;
+      const optedIn = pushSub.optedIn;
+      const id = pushSub.id;
+      setStep('push', !!optedIn, 'مفعّل: ' + optedIn);
+      setStep('id', !!id, id ? ('رقم الاشتراك: ' + id) : 'لسه معملوش رقم اشتراك');
+    } catch(e) {
+      setStep('push', false, e.message || String(e));
+    }
+  });
+}
+</script>
+</body>
+</html>
