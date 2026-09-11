@@ -74,9 +74,10 @@
   .ad-dots{display:flex;justify-content:center;gap:6px;margin-top:10px;}
   .ad-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .3s ease;}
   .ad-dot.active{width:20px;background:var(--maroon);}
-  .offer-banners-row{display:flex;gap:10px;overflow-x:auto;padding:2px 16px 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
-  .offer-banners-row::-webkit-scrollbar{display:none;}
-  .offer-banner-card{flex:0 0 78%;scroll-snap-align:start;border-radius:18px;padding:14px 16px;min-height:96px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 6px 18px rgba(122,31,31,0.3);border:1px solid rgba(255,255,255,0.15);text-align:right;}
+  .ad-banner-sub{margin:10px 16px 0;border-radius:16px;padding:12px 16px;min-height:64px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 6px 16px rgba(122,31,31,0.28);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
+  .ad-banner-sub::after{content:'';position:absolute;right:-24px;top:-24px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.08);}
+  .ad-sub-title{position:relative;font-size:13px;font-weight:900;line-height:1.3;text-shadow:0 1px 3px rgba(0,0,0,0.25);}
+  .ad-sub-sub{position:relative;font-size:10.5px;margin-top:3px;opacity:0.95;font-weight:600;}
   @keyframes adFadeIn{from{opacity:0;transform:translateY(4px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
   @keyframes adPulse{0%,100%{box-shadow:0 8px 24px rgba(122,31,31,0.35);}50%{box-shadow:0 8px 28px rgba(122,31,31,0.55);}}
   .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px;}
@@ -326,6 +327,7 @@
     </div>
 
     <div id="adBannerWrap"></div>
+    <div id="adBannerWrapSecondary"></div>
 
     <div class="row-2">
       <button class="action-btn" onclick="applyLastOrder()"><i class="fas fa-rotate-left"></i> اطلب زي آخر مرة</button>
@@ -337,8 +339,8 @@
       <a class="action-btn" href="https://chat.whatsapp.com/LGpJY9nsxKxDkMPmnVmxiy?s=cl&p=a&mlu=4" target="_blank" rel="noopener" style="text-decoration:none;background:#25D366;color:#fff;"><i class="fab fa-whatsapp"></i> جروب عملاء المعلم</a>
     </div>
 
-    <div class="section-head" id="offerBannersHead" style="display:none;"><div class="section-bar"></div><div class="section-title">آخر العروض</div></div>
-    <div id="offerBannersRow" class="offer-banners-row"></div>
+    <div class="section-head" id="offersStripHead"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">عروض حصرية</div></div>
+    <div id="offersStripRow" class="prod-row"></div>
 
     <div class="section-head"><div class="section-bar"></div><div class="section-title">الأقسام</div></div>
     <div id="categoriesGrid" class="cat-grid"></div>
@@ -626,7 +628,7 @@ function formatDate(ts){
 
 /* --- إعادة رسم أي شاشة مفتوحة حاليًا بعد وصول تحديث (منتجات أو طلبات) --- */
 function refreshVisibleScreens(){
-  renderHome(); renderAdBanners(); renderOfferBanners();
+  renderHome(); renderAdBanners();
   if (document.getElementById('categoryScreen').classList.contains('active')) renderCategoryProducts();
   if (document.getElementById('searchScreen').classList.contains('active')) renderSearchResults();
   if (document.getElementById('favoritesScreen').classList.contains('active')) renderFavorites();
@@ -879,7 +881,7 @@ function startApp(){
   loadLoyaltyPoints();
   updateCartBadge();
   renderHome();
-  renderAdBanners(); renderOfferBanners();
+  renderAdBanners();
   showLoading(false);
   initCloud();
   initOneSignalForCustomer();
@@ -953,6 +955,17 @@ function categoryIconHtml(cat){
   return '<div class="cat-icon"><i class="fas fa-box"></i></div>';
 }
 function renderHome(){
+  var offersRow = document.getElementById('offersStripRow');
+  // شريط "عروض حصرية" بيظهر بس لو فيه عروض فعّالة حاليًا (نفس منطق شاشة العروض بالظبط)
+  var offerProducts = appOffers
+    .map(function(o){ return products.find(function(x){ return x.code === o.productCode; }); })
+    .filter(Boolean);
+  var seenOffer = {};
+  offerProducts = offerProducts.filter(function(p){ if (seenOffer[p.code]) return false; seenOffer[p.code] = true; return true; });
+  offerProducts = inStockOnly(offerProducts);
+  document.getElementById('offersStripHead').style.display = offerProducts.length ? 'flex' : 'none';
+  offersRow.innerHTML = offerProducts.map(function(p){return productCardHtml(p);}).join('');
+
   var grid = document.getElementById('categoriesGrid');
   if (appCategories.length === 0){
     grid.innerHTML = '<div class="empty-note" style="grid-column:1/-1;">لسه مفيش أقسام مضافة من المعلم</div>';
@@ -971,47 +984,43 @@ function renderHome(){
 }
 
 function renderAdBanners(){
-  var topBanners = appBanners.filter(function(b){ return (b.placement || 'top') === 'top'; });
   var wrap = document.getElementById('adBannerWrap');
   clearInterval(adTimer);
-  if (topBanners.length === 0){ wrap.innerHTML = ''; return; }
+  if (appBanners.length === 0){ wrap.innerHTML = ''; document.getElementById('adBannerWrapSecondary').innerHTML = ''; return; }
   adIndex = 0;
-  drawAdBanner(topBanners);
-  adTimer = setInterval(function(){ adIndex = (adIndex + 1) % topBanners.length; drawAdBanner(topBanners); }, 4000);
+  drawAdBanner();
+  adTimer = setInterval(function(){ adIndex = (adIndex + 1) % appBanners.length; drawAdBanner(); }, 4000);
 }
-function drawAdBanner(topBanners){
-  var b = topBanners[adIndex];
+function drawAdBanner(){
+  var b = appBanners[adIndex];
   var wrap = document.getElementById('adBannerWrap');
   var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.62), rgba(94,20,20,0.82)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
                         : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
-  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(&#39;top&#39;,' + adIndex + ')">' +
+  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(' + adIndex + ')">' +
       '<div class="ad-badge"><i class="fas fa-bolt"></i> عرض خاص</div>' +
       '<div class="ad-title">' + b.title + '</div>' +
       (b.subtitle ? '<div class="ad-sub">' + b.subtitle + '</div>' : '') +
       '<div class="ad-cta">اضغط للتفاصيل <i class="fas fa-arrow-left"></i></div>' +
       '</button>' +
-      '<div class="ad-dots">' + topBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>';
+      '<div class="ad-dots">' + appBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>';
+  drawSecondaryBanner();
 }
-function renderOfferBanners(){
-  var offerBanners = appBanners.filter(function(b){ return b.placement === 'offers'; });
-  var head = document.getElementById('offerBannersHead');
-  var wrap = document.getElementById('offerBannersRow');
-  if (offerBanners.length === 0){ head.style.display = 'none'; wrap.innerHTML = ''; return; }
-  head.style.display = 'flex';
-  wrap.innerHTML = offerBanners.map(function(b, i){
-    var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.55), rgba(94,20,20,0.78)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
-                          : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
-    return '<button class="offer-banner-card" style="' + bg + '" onclick="handleBannerClick(&#39;offers&#39;,' + i + ')">' +
-        '<div class="ad-badge"><i class="fas fa-bolt"></i> عرض خاص</div>' +
-        '<div class="ad-title" style="font-size:13px;">' + b.title + '</div>' +
-        (b.subtitle ? '<div class="ad-sub" style="font-size:10px;">' + b.subtitle + '</div>' : '') +
-        '</button>';
-  }).join('');
+function drawSecondaryBanner(){
+  var subWrap = document.getElementById('adBannerWrapSecondary');
+  // البانر الفرعي بيظهر بس لو فيه أكتر من بانر واحد مضاف، وبيعرض البانر اللي جاي في الترتيب
+  // (تحت البانر الرئيسي مباشرة) عشان محدش يتكرر لو مفيش غير بانر واحد بس
+  if (appBanners.length < 2){ subWrap.innerHTML = ''; return; }
+  var subIndex = (adIndex + 1) % appBanners.length;
+  var b = appBanners[subIndex];
+  var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.62), rgba(94,20,20,0.82)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+                        : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
+  subWrap.innerHTML = '<button class="ad-banner-sub" style="' + bg + 'width:calc(100% - 32px);" onclick="handleBannerClick(' + subIndex + ')">' +
+      '<div class="ad-sub-title">' + b.title + '</div>' +
+      (b.subtitle ? '<div class="ad-sub-sub">' + b.subtitle + '</div>' : '') +
+      '</button>';
 }
-function handleBannerClick(placement, i){
-  var list = appBanners.filter(function(b){ return (b.placement || 'top') === placement; });
-  var b = list[i];
-  if (!b) return;
+function handleBannerClick(i){
+  var b = appBanners[i];
   if (b.linkType === 'category') { var cat = appCategories.find(function(c){return c.name === b.linkValue;}); if (cat) openCategory(cat.id); }
   else if (b.linkType === 'product') { switchScreen('search'); document.getElementById('searchInput').value = ''; }
 }
