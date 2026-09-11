@@ -43,6 +43,7 @@ async function runDiagnosis(){
   document.getElementById('steps').innerHTML = '';
   addStep('sdk', 'تحميل مكتبة OneSignal في الصفحة');
   addStep('sw', 'وجود ملف الـ Service Worker (OneSignalSDKWorker.js)');
+  addStep('rawpush', 'اشتراك دفع خام من المتصفح مباشرة (بدون OneSignal)');
   addStep('init', 'تهيئة (Init) الاتصال بحسابك في OneSignal');
   addStep('perm', 'حالة إذن الإشعارات في المتصفح');
   addStep('push', 'إنشاء اشتراك دفع فعلي (Push Subscription)');
@@ -66,6 +67,25 @@ async function runDiagnosis(){
     return;
   }
   setStep('sdk', true);
+
+  // اختبار خام: نحاول ننشئ اشتراك Push مباشرة من المتصفح (Web Push API) من غير أي علاقة بـ
+  // OneSignal، عشان نعرف هل المشكلة في المتصفح/الجهاز نفسه، ولا في OneSignal تحديدًا
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      if (Notification.permission !== 'granted') {
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') throw new Error('الإذن مرفوض من المتصفح (permission: ' + p + ')');
+      }
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true
+      });
+    }
+    setStep('rawpush', !!sub, sub ? 'الاشتراك الخام نجح' : 'رجع فاضي من غير سبب واضح');
+  } catch (e) {
+    setStep('rawpush', false, e.message || String(e));
+  }
 
   window.OneSignalDeferred.push(async function(OneSignal){
     try {
