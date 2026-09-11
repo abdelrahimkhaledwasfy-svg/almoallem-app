@@ -1015,7 +1015,7 @@ function drawAdBanner(mainBanners){
   // لو البانر عنده صورة، الصورة نفسها بتكون مصممة وفيها كل الكلام المطلوب، فمش بنحط أي نص
   // فوقها خالص (لا عنوان ولا شارة "عرض خاص"). النص بيظهر بس لو البانر من غير صورة
   var hasImage = !!b.imageUrl;
-  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);'
                      : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
   var textBlock = hasImage ? '' :
       '<div class="ad-title">' + b.title + '</div>' +
@@ -1041,7 +1041,7 @@ function drawOneSecondaryBanner(offerBanners){
   var subWrap = document.getElementById('adBannerWrapSecondary');
   var b = offerBanners[subAdIndex];
   var hasImage = !!b.imageUrl;
-  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);'
                      : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
   var textBlock = hasImage ? '' :
       '<div class="ad-sub-title">' + b.title + '</div>' +
