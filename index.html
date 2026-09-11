@@ -64,7 +64,7 @@
   .section-head{display:flex;align-items:center;gap:8px;margin:20px 16px 12px;}
   .section-bar{width:4px;height:16px;border-radius:2px;background:var(--maroon);}
   .section-title{font-size:13px;font-weight:800;}
-  .ad-banner{margin:14px 16px 0;border-radius:20px;padding:18px 20px;min-height:118px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 8px 24px rgba(122,31,31,0.35);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
+  .ad-banner{margin:14px 16px 0;border-radius:20px;padding:18px 20px;min-height:118px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 8px 24px rgba(122,31,31,0.35);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
   .ad-banner::before{content:'';position:absolute;left:-20px;bottom:-30px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,0.14);}
   .ad-banner::after{content:'';position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.08);}
   .ad-badge{position:relative;align-self:flex-start;background:rgba(255,255,255,0.22);backdrop-filter:blur(2px);color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;margin-bottom:8px;display:flex;align-items:center;gap:4px;}
@@ -74,10 +74,12 @@
   .ad-dots{display:flex;justify-content:center;gap:6px;margin-top:10px;}
   .ad-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .3s ease;}
   .ad-dot.active{width:20px;background:var(--maroon);}
-  .ad-banner-sub{margin:10px 16px 0;border-radius:16px;padding:12px 16px;min-height:64px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 6px 16px rgba(122,31,31,0.28);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
+  .ad-banner-sub{border-radius:16px;padding:12px 16px;min-height:64px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 6px 16px rgba(122,31,31,0.28);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;flex:0 0 auto;width:220px;text-align:right;}
   .ad-banner-sub::after{content:'';position:absolute;right:-24px;top:-24px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.08);}
   .ad-sub-title{position:relative;font-size:13px;font-weight:900;line-height:1.3;text-shadow:0 1px 3px rgba(0,0,0,0.25);}
   .ad-sub-sub{position:relative;font-size:10.5px;margin-top:3px;opacity:0.95;font-weight:600;}
+  .ad-banner-sub-row{display:flex;gap:10px;margin:0 16px;overflow-x:auto;padding-bottom:4px;}
+  .ad-banner-sub-row::-webkit-scrollbar{display:none;}
   @keyframes adFadeIn{from{opacity:0;transform:translateY(4px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
   @keyframes adPulse{0%,100%{box-shadow:0 8px 24px rgba(122,31,31,0.35);}50%{box-shadow:0 8px 28px rgba(122,31,31,0.55);}}
   .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px;}
@@ -986,41 +988,52 @@ function renderHome(){
 function renderAdBanners(){
   var wrap = document.getElementById('adBannerWrap');
   clearInterval(adTimer);
-  if (appBanners.length === 0){ wrap.innerHTML = ''; document.getElementById('adBannerWrapSecondary').innerHTML = ''; return; }
-  adIndex = 0;
-  drawAdBanner();
-  adTimer = setInterval(function(){ adIndex = (adIndex + 1) % appBanners.length; drawAdBanner(); }, 4000);
+  // كل بانر بيتحدد له "مكان الظهور" من لوحة التحكم: أعلى الرئيسية (top) أو آخر العروض (offers).
+  // البانر الرئيسي بيدور بس على بنرات "top"، وصف "آخر العروض" بيعرض بنرات "offers" كلها مع بعض
+  var mainBanners = appBanners.filter(function(b){ return (b.placement || 'top') !== 'offers'; });
+  if (mainBanners.length === 0){ wrap.innerHTML = ''; }
+  else {
+    adIndex = 0;
+    drawAdBanner(mainBanners);
+    // توقيت أبطأ عشان يدي وقت كافي للقراءة قبل ما البانر يتغير
+    if (mainBanners.length > 1){
+      adTimer = setInterval(function(){ adIndex = (adIndex + 1) % mainBanners.length; drawAdBanner(mainBanners); }, 7000);
+    }
+  }
+  drawSecondaryBanners();
 }
-function drawAdBanner(){
-  var b = appBanners[adIndex];
+function drawAdBanner(mainBanners){
+  var b = mainBanners[adIndex];
   var wrap = document.getElementById('adBannerWrap');
-  var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.62), rgba(94,20,20,0.82)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+  // لو البانر عنده صورة، بنسيبها واضحة تمامًا ونحط تظليل خفيف أسفل البانر بس عشان الكلام يفضل
+  // مقروء (بدل ما كان في الأول تغطية حمرا كثيفة بتغطي الصورة كلها)
+  var bg = b.imageUrl ? 'background-image:linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.32) 45%, rgba(0,0,0,0) 80%), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
                         : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
-  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(' + adIndex + ')">' +
+  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
       '<div class="ad-badge"><i class="fas fa-bolt"></i> عرض خاص</div>' +
       '<div class="ad-title">' + b.title + '</div>' +
       (b.subtitle ? '<div class="ad-sub">' + b.subtitle + '</div>' : '') +
       '<div class="ad-cta">اضغط للتفاصيل <i class="fas fa-arrow-left"></i></div>' +
       '</button>' +
-      '<div class="ad-dots">' + appBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>';
-  drawSecondaryBanner();
+      (mainBanners.length > 1 ? ('<div class="ad-dots">' + mainBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>') : '');
 }
-function drawSecondaryBanner(){
+function drawSecondaryBanners(){
   var subWrap = document.getElementById('adBannerWrapSecondary');
-  // البانر الفرعي بيظهر بس لو فيه أكتر من بانر واحد مضاف، وبيعرض البانر اللي جاي في الترتيب
-  // (تحت البانر الرئيسي مباشرة) عشان محدش يتكرر لو مفيش غير بانر واحد بس
-  if (appBanners.length < 2){ subWrap.innerHTML = ''; return; }
-  var subIndex = (adIndex + 1) % appBanners.length;
-  var b = appBanners[subIndex];
-  var bg = b.imageUrl ? 'background-image:linear-gradient(135deg, rgba(122,31,31,0.62), rgba(94,20,20,0.82)), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
-                        : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
-  subWrap.innerHTML = '<button class="ad-banner-sub" style="' + bg + 'width:calc(100% - 32px);" onclick="handleBannerClick(' + subIndex + ')">' +
-      '<div class="ad-sub-title">' + b.title + '</div>' +
-      (b.subtitle ? '<div class="ad-sub-sub">' + b.subtitle + '</div>' : '') +
-      '</button>';
+  var offerBanners = appBanners.filter(function(b){ return b.placement === 'offers'; });
+  if (offerBanners.length === 0){ subWrap.innerHTML = ''; return; }
+  subWrap.innerHTML = '<div class="section-head" style="margin:14px 16px 6px;"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">آخر العروض</div></div>' +
+    '<div class="ad-banner-sub-row">' + offerBanners.map(function(b){
+      var bg = b.imageUrl ? 'background-image:linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.3) 45%, rgba(0,0,0,0) 80%), url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-position:center;'
+                            : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
+      return '<button class="ad-banner-sub" style="' + bg + '" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
+        '<div class="ad-sub-title">' + b.title + '</div>' +
+        (b.subtitle ? '<div class="ad-sub-sub">' + b.subtitle + '</div>' : '') +
+        '</button>';
+    }).join('') + '</div>';
 }
-function handleBannerClick(i){
-  var b = appBanners[i];
+function handleBannerClick(id){
+  var b = appBanners.find(function(x){ return x.id === id; });
+  if (!b) return;
   if (b.linkType === 'category') { var cat = appCategories.find(function(c){return c.name === b.linkValue;}); if (cat) openCategory(cat.id); }
   else if (b.linkType === 'product') { switchScreen('search'); document.getElementById('searchInput').value = ''; }
 }
