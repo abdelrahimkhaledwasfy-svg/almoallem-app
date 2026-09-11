@@ -89,7 +89,12 @@ async function runDiagnosis(){
 
   window.OneSignalDeferred.push(async function(OneSignal){
     try {
-      await OneSignal.init({ appId: APP_ID, allowLocalhostAsSecureOrigin: true });
+      await OneSignal.init({
+        appId: APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: 'almoallem-app/OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/almoallem-app/' }
+      });
       setStep('init', true);
     } catch(e) {
       const msg = e.message || String(e);
