@@ -370,6 +370,21 @@
     <div id="repVisitsList" style="margin:0 16px 24px;"></div>
   </div>
 
+  <div id="deliveryHomeScreen" class="screen">
+    <div class="welcome-card">
+      <div class="welcome-row">
+        <div class="avatar-badge">م</div>
+        <div style="flex:1;">
+          <div class="welcome-sub">أهلاً بيك يا مندوب تسليم</div>
+          <div class="welcome-name" id="deliveryWelcomeName">-</div>
+        </div>
+        <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
+      </div>
+    </div>
+    <div style="margin:14px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
+    <div id="deliveryInvoicesList" style="margin:0 16px 24px;"></div>
+  </div>
+
   <div id="homeScreen" class="screen active">
     <div class="welcome-card">
       <div class="welcome-row">
@@ -589,6 +604,26 @@
       <div id="repVisitLocationStatus" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
     </div>
     <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveRepVisit()">حفظ الزيارة</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deliveryRejectModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);">سبب عدم التسليم</div>
+      <button onclick="closeModalOverlay('deliveryRejectModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <input type="hidden" id="deliveryRejectInvoiceId">
+    <div class="field">
+      <label>السبب</label>
+      <select class="form-input" id="deliveryRejectReasonSelect">
+        <option value="العميل غير موجود">العميل غير موجود</option>
+        <option value="رفض الاستلام">رفض الاستلام</option>
+        <option value="سبب آخر">سبب آخر</option>
+      </select>
+    </div>
+    <div class="field"><label>تفاصيل إضافية</label><textarea class="form-textarea" id="deliveryRejectReasonDetail" rows="2"></textarea></div>
+    <button class="btn-primary" style="width:100%;background:var(--danger);" onclick="confirmDeliveryReject()">تأكيد عدم التسليم</button>
   </div>
 </div>
 
@@ -893,7 +928,7 @@ async function doRepLoginSubmit(){
     if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
     if (rep.status && rep.status !== 'نشط') { showToast('حساب المندوب موقوف حاليًا', 'error'); return; }
     repMode = true;
-    currentRep = { code: rep.code, name: rep.name };
+    currentRep = { code: rep.code, name: rep.name, type: rep.repType === 'delivery' ? 'delivery' : 'sales' };
     localStorage.setItem('app_rep_mode', '1');
     localStorage.setItem('app_current_rep', JSON.stringify(currentRep));
     isGuest = true; // وضع المندوب مش مرتبط بحساب عميل، فبنعامله كوضع تصفح مفتوح بدون حساب عميل
@@ -1070,6 +1105,102 @@ function cancelRepOrderFlow(){
   renderRepHome();
 }
 
+// ==================== وضع مندوب التسليم ====================
+let deliveryInvoices = [];
+let deliveryListenerStarted = false;
+
+function startDeliveryInvoicesListener(){
+  if (!db || deliveryListenerStarted) return;
+  deliveryListenerStarted = true;
+  db.collection('invoiceRecords').where('deliveryStatus', 'in', ['بانتظار التسليم', 'لم يتم التسليم']).onSnapshot(function(snap){
+    deliveryInvoices = snap.docs.map(function(d){ return d.data(); });
+    deliveryInvoices.sort(function(a,b){ return (a.deliveryStatus === 'بانتظار التسليم' ? 0 : 1) - (b.deliveryStatus === 'بانتظار التسليم' ? 0 : 1); });
+    renderDeliveryInvoicesList();
+  }, function(err){ console.error('Delivery invoices listener error:', err); });
+}
+
+function renderDeliveryHome(){
+  document.getElementById('deliveryWelcomeName').textContent = currentRep ? currentRep.name : '-';
+  renderDeliveryInvoicesList();
+}
+
+function renderDeliveryInvoicesList(){
+  var wrap = document.getElementById('deliveryInvoicesList');
+  if (!wrap) return;
+  if (deliveryInvoices.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px;">لا توجد فواتير جاهزة للتسليم حاليًا</div>'; return; }
+  wrap.innerHTML = deliveryInvoices.map(function(inv){
+    var pending = inv.deliveryStatus === 'بانتظار التسليم';
+    var statusHtml = pending ? '<span style="background:#E7F0FF;color:#2A5EA8;padding:3px 8px;border-radius:8px;font-size:9.5px;font-weight:800;">بانتظار التسليم</span>'
+      : '<span style="background:#FBE3C9;color:var(--danger);padding:3px 8px;border-radius:8px;font-size:9.5px;font-weight:800;">لم يتم: ' + (inv.deliveryRejectReason || '') + '</span>';
+    var addr = inv.addressDetail || inv.shopName || '';
+    var mapBtn = (inv.location && inv.location.lat) ? ('<a href="https://maps.google.com/?q=' + inv.location.lat + ',' + inv.location.lng + '" target="_blank" style="font-size:10px;color:var(--maroon);font-weight:800;"><i class="fas fa-location-dot"></i> فتح الموقع على الخريطة</a>') : '';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+        '<div><div style="font-size:12.5px;font-weight:900;">' + (inv.customerName || '') + '</div>' +
+        '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + addr + '</div></div>' +
+        statusHtml +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">' +
+        '<div style="font-size:12px;font-weight:900;color:var(--maroon);">' + money(inv.grandTotal || inv.total || 0) + ' ج.م</div>' +
+        mapBtn +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:10px;">' +
+        '<button onclick="markInvoiceDelivered(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--success);color:#fff;border-radius:10px;padding:9px;font-size:11px;font-weight:800;"><i class="fas fa-check"></i> تم التسليم والتحصيل</button>' +
+        '<button onclick="openDeliveryRejectModal(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--danger);color:#fff;border-radius:10px;padding:9px;font-size:11px;font-weight:800;"><i class="fas fa-xmark"></i> لم يتم</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function updateDeliveryInvoiceStatus(invoiceId, patch){
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
+  var inv = deliveryInvoices.find(function(i){ return String(i.id) === String(invoiceId); });
+  if (!inv) return;
+  Object.assign(inv, patch);
+  db.collection('invoiceRecords').doc(String(inv.id)).set(inv).catch(function(e){ console.error('invoice delivery update failed:', e); showToast('تعذر تحديث الفاتورة', 'error'); });
+}
+
+function markInvoiceDelivered(invoiceId){
+  var inv = deliveryInvoices.find(function(i){ return String(i.id) === String(invoiceId); });
+  if (!inv) return;
+  updateDeliveryInvoiceStatus(invoiceId, {
+    deliveryStatus: 'تم التسليم', deliveredAt: Date.now(),
+    deliveredBy: currentRep ? currentRep.code : ''
+  });
+  // الفلوس بتتسجل في عهدة خاصة بالمندوب ده لوحده، منفصلة عن الخزينة العامة، لحد ما تتراجع
+  var record = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    date: new Date().toISOString(),
+    repUsername: currentRep ? currentRep.code : '',
+    repFullName: currentRep ? currentRep.name : '',
+    invoiceId: inv.id, invoiceNumber: inv.number,
+    customerName: inv.customerName, amount: inv.grandTotal || inv.total || 0
+  };
+  if (db) db.collection('deliveryCollectionRecords').doc(String(record.id)).set(record).catch(function(e){ console.error('delivery collection sync failed:', e); });
+  showToast('تم تسجيل التسليم والتحصيل ✓');
+}
+
+function openDeliveryRejectModal(invoiceId){
+  document.getElementById('deliveryRejectInvoiceId').value = invoiceId;
+  document.getElementById('deliveryRejectReasonSelect').value = 'العميل غير موجود';
+  document.getElementById('deliveryRejectReasonDetail').value = '';
+  openModalOverlay('deliveryRejectModal');
+}
+
+function confirmDeliveryReject(){
+  var invoiceId = document.getElementById('deliveryRejectInvoiceId').value;
+  var reason = document.getElementById('deliveryRejectReasonSelect').value;
+  var detail = document.getElementById('deliveryRejectReasonDetail').value.trim();
+  updateDeliveryInvoiceStatus(invoiceId, {
+    deliveryStatus: 'لم يتم التسليم',
+    deliveryRejectReason: reason + (detail ? (' - ' + detail) : ''),
+    deliveryRejectAt: Date.now(),
+    deliveryRejectBy: currentRep ? currentRep.code : ''
+  });
+  closeModalOverlay('deliveryRejectModal');
+  showToast('تم تسجيل عدم التسليم');
+}
+
 
 function enterAsGuest(){
   isGuest = true;
@@ -1212,8 +1343,14 @@ function startApp(){
   if (repMode) {
     document.getElementById('topTabsBar').style.display = 'none';
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
-    switchScreenRaw('repHome');
-    renderRepHome();
+    if (currentRep && currentRep.type === 'delivery') {
+      switchScreenRaw('deliveryHome');
+      renderDeliveryHome();
+      startDeliveryInvoicesListener();
+    } else {
+      switchScreenRaw('repHome');
+      renderRepHome();
+    }
   } else {
     renderHome();
   }
