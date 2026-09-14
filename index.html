@@ -256,6 +256,36 @@
       <button class="btn-login-gold" id="loginBtn" onclick="doLoginScreenSubmit()">تسجيل الدخول</button>
       <div class="login-divider">— أو —</div>
       <div class="login-signup-row">مستخدم جديد؟ <a onclick="showRegisterScreen()">إنشاء حساب</a></div>
+      <div class="login-signup-row" style="margin-top:6px;">أنا مندوب <a onclick="showRepLoginScreen()">دخول كمندوب</a></div>
+    </div>
+  </div>
+</div>
+
+<div id="repLoginScreen" class="screen" style="padding:0;justify-content:flex-start;">
+  <div class="login-header">
+    <span class="login-skip" onclick="showLoginScreenFromRep()"><i class="fas fa-chevron-right"></i> رجوع</span>
+    <div class="login-logo-circle"><img src="icon-512.png" alt="المعلم" style="width:44px;height:44px;border-radius:50%;"></div>
+    <div class="login-header-title">دخول المناديب</div>
+    <div class="login-header-sub">وضع مندوب - زيارات وطلبات نيابة عن التجار</div>
+  </div>
+  <div class="login-body">
+    <div class="login-card">
+      <div class="field">
+        <label>يوزر المندوب</label>
+        <div class="input-wrap">
+          <input type="text" id="repLoginUsername" placeholder="اكتب يوزر الدخول..." dir="ltr" style="text-align:left;">
+          <i class="fas fa-user"></i>
+        </div>
+      </div>
+      <div class="field">
+        <label>كلمة السر</label>
+        <div class="input-wrap">
+          <input type="password" id="repLoginPassword" placeholder="ادخل كلمة السر" dir="ltr" style="text-align:left;">
+          <i class="fas fa-lock"></i>
+          <i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('repLoginPassword', this)"></i>
+        </div>
+      </div>
+      <button class="btn-login-gold" id="repLoginBtn" onclick="doRepLoginSubmit()">دخول</button>
     </div>
   </div>
 </div>
@@ -302,10 +332,42 @@
 </div>
 
 <div id="appRoot" class="hidden">
-  <div class="top-tabs">
+  <div class="top-tabs" id="topTabsBar">
     <button class="top-tab" data-toptab="orders" onclick="switchTopTab('orders')">طلباتي</button>
     <button class="top-tab" data-toptab="account" onclick="switchTopTab('account')">حسابي</button>
     <button class="top-tab active" data-toptab="home" onclick="switchTopTab('home')">الرئيسية</button>
+  </div>
+
+  <div id="repOrderBanner" class="hidden" style="display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--gold);color:var(--ink);padding:8px 14px;font-size:11px;font-weight:800;">
+    <span>🧾 بتطلب حاليًا لصالح: <span id="repOrderBannerName">-</span></span>
+    <button onclick="cancelRepOrderFlow()" style="background:rgba(0,0,0,0.15);border-radius:8px;padding:4px 10px;font-size:10.5px;font-weight:800;">إلغاء</button>
+  </div>
+
+  <div id="repHomeScreen" class="screen">
+    <div class="welcome-card">
+      <div class="welcome-row">
+        <div class="avatar-badge">م</div>
+        <div style="flex:1;">
+          <div class="welcome-sub">أهلاً بيك يا مندوب</div>
+          <div class="welcome-name" id="repWelcomeName">-</div>
+        </div>
+        <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
+      </div>
+    </div>
+
+    <div style="margin:14px 16px;">
+      <div class="field">
+        <label>اختر التاجر</label>
+        <div class="input-wrap">
+          <input type="text" id="repClientSearch" placeholder="اكتب اسم التاجر أو رقم الهاتف..." oninput="renderRepClientResults()">
+          <i class="fas fa-magnifying-glass"></i>
+        </div>
+      </div>
+      <div id="repClientResults" style="margin-top:8px;max-height:260px;overflow-y:auto;"></div>
+    </div>
+
+    <div style="margin:18px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);"><i class="fas fa-route"></i> آخر زياراتي</div>
+    <div id="repVisitsList" style="margin:0 16px 24px;"></div>
   </div>
 
   <div id="homeScreen" class="screen active">
@@ -494,6 +556,42 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="repClientActionsModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);" id="repClientActionsName">-</div>
+      <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-bottom:10px;" onclick="openRepVisitModal()"><i class="fas fa-route"></i> زيارة جديدة</button>
+    <button class="btn-primary" style="width:100%;" onclick="startRepOrderFlow()"><i class="fas fa-cart-shopping"></i> تصفح المنتجات وإنشاء طلب</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="repVisitModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);">زيارة جديدة</div>
+      <button onclick="closeModalOverlay('repVisitModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <div style="font-size:11.5px;font-weight:800;margin-bottom:10px;" id="repVisitClientName">-</div>
+    <div class="field">
+      <label>حالة الزيارة</label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="repVisitSuccessBtn" onclick="setRepVisitStatus('ناجحة')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #2e8b57;background:#eafaf0;color:#2e8b57;font-weight:800;font-size:11px;">✅ ناجحة</button>
+        <button type="button" id="repVisitFailBtn" onclick="setRepVisitStatus('غير ناجحة')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #c0392b;background:#fdecea;color:#c0392b;font-weight:800;font-size:11px;">❌ غير ناجحة</button>
+      </div>
+    </div>
+    <div class="field"><label>سبب الزيارة</label><input type="text" id="repVisitPurpose" placeholder="مثال: متابعة طلب، تحصيل..."></div>
+    <div class="field"><label>ملاحظات</label><textarea class="form-textarea" id="repVisitNotes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea></div>
+    <div class="field">
+      <label>الموقع</label>
+      <button class="map-btn" type="button" onclick="captureRepVisitLocation()"><i class="fas fa-location-dot"></i> <span>تسجيل موقعي الحالي</span></button>
+      <div id="repVisitLocationStatus" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveRepVisit()">حفظ الزيارة</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="ratingModal">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -613,6 +711,16 @@ let isGuest = localStorage.getItem('app_guest_mode') === '1';
 let editingProfile = false;
 const MIN_ORDER_AMOUNT = 100;
 
+// ==================== وضع مندوب (زيارات + طلب نيابة عن تاجر) ====================
+let allCustomers = getStorage('customers', []); // كل عملاء المعلم - يستخدمها المندوب للاختيار منها
+let allSalesmen  = getStorage('salesmen', []);  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
+let repMode = localStorage.getItem('app_rep_mode') === '1';
+let currentRep = JSON.parse(localStorage.getItem('app_current_rep') || 'null');
+let repTargetCustomer = null; // العميل المختار حاليًا عشان المندوب يزوره/يطلب له
+let repVisits = JSON.parse(localStorage.getItem('app_rep_visits') || '[]');
+let repPendingLocation = null;
+let repVisitStatusValue = '';
+
 function money(n){ return (n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function showToast(msg, ms){
   var t = document.getElementById('toast');
@@ -673,6 +781,9 @@ function applyStoreData(data){
   loyaltySettings = data.loyaltySettings || loyaltySettings;
   requireActivationCode = !!data.requireActivationCode;
   activationCodes = data.activationCodes || [];
+  // بيانات "وضع مندوب": قايمة العملاء (للاختيار منها) وقايمة المناديب (لفحص بيانات الدخول)
+  allCustomers = data.customers || [];
+  allSalesmen  = data.salesmen || [];
   // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
   setStorage('products', data.products || []);
   setStorage('appCategories', data.appCategories || []);
@@ -681,10 +792,12 @@ function applyStoreData(data){
   setStorage('appOffers', data.appOffers || []);
   setStorage('inventory', inv);
   setStorage('customers', data.customers || []);
+  setStorage('salesmen', data.salesmen || []);
   localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
   localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
   localStorage.setItem('activationCodes', JSON.stringify(activationCodes));
   loadLoyaltyPoints();
+  if (repMode) refreshRepScreensIfNeeded();
 }
 
 function listenStoreData(){
@@ -714,6 +827,8 @@ function loadStoreDataFromLocalCache(){
   for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
   requireActivationCode = getStorage('requireActivationCode', false);
   activationCodes = getStorage('activationCodes', []);
+  allCustomers = getStorage('customers', []);
+  allSalesmen  = getStorage('salesmen', []);
 }
 
 // ==================== تسجيل الدخول / إنشاء حساب / وضع الزائر ====================
@@ -751,6 +866,210 @@ function showLoginScreenFromRegister(){
   document.getElementById('registerScreen').classList.remove('active');
   document.getElementById('loginScreen').classList.add('active');
 }
+
+function showRepLoginScreen(){
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('repLoginScreen').classList.add('active');
+}
+function showLoginScreenFromRep(){
+  document.getElementById('repLoginScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+}
+
+async function doRepLoginSubmit(){
+  var username = document.getElementById('repLoginUsername').value.trim();
+  var password = document.getElementById('repLoginPassword').value;
+  if (!username || !password) { showToast('ادخل اليوزر وكلمة السر', 'error'); return; }
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
+  showLoading(true);
+  try {
+    // بنجيب أحدث نسخة من بيانات المناديب مباشرة (بدل ما نستنى الـ listener) عشان نضمن دخول صحيح من أول مرة
+    var docSnap = await db.collection('storeData').doc('main').get();
+    var data = docSnap.exists ? docSnap.data() : {};
+    var salesmenList = data.salesmen || [];
+    var hash = await hashPassword(password);
+    var rep = salesmenList.find(function(s){ return s.repUsername && s.repUsername === username && s.repPasswordHash === hash; });
+    showLoading(false);
+    if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
+    if (rep.status && rep.status !== 'نشط') { showToast('حساب المندوب موقوف حاليًا', 'error'); return; }
+    repMode = true;
+    currentRep = { code: rep.code, name: rep.name };
+    localStorage.setItem('app_rep_mode', '1');
+    localStorage.setItem('app_current_rep', JSON.stringify(currentRep));
+    isGuest = true; // وضع المندوب مش مرتبط بحساب عميل، فبنعامله كوضع تصفح مفتوح بدون حساب عميل
+    startApp();
+  } catch (err) {
+    console.error('Rep login failed:', err);
+    showLoading(false);
+    showToast('تعذر تسجيل الدخول، حاول تاني', 'error');
+  }
+}
+
+function repLogout(){
+  repMode = false;
+  currentRep = null;
+  repTargetCustomer = null;
+  localStorage.removeItem('app_rep_mode');
+  localStorage.removeItem('app_current_rep');
+  location.reload();
+}
+
+function openModalOverlay(id){ document.getElementById(id).classList.add('show'); }
+function closeModalOverlay(id){ document.getElementById(id).classList.remove('show'); }
+
+function refreshRepScreensIfNeeded(){
+  if (document.getElementById('repHomeScreen') && document.getElementById('repHomeScreen').classList.contains('active')) {
+    renderRepClientResults();
+    renderRepVisitsList();
+  }
+}
+
+function renderRepHome(){
+  document.getElementById('repWelcomeName').textContent = currentRep ? currentRep.name : '-';
+  document.getElementById('repClientSearch').value = '';
+  renderRepClientResults();
+  renderRepVisitsList();
+}
+
+function renderRepClientResults(){
+  var q = (document.getElementById('repClientSearch').value || '').trim().toLowerCase();
+  var list = allCustomers;
+  if (q) {
+    list = list.filter(function(c){
+      return (c.name || '').toLowerCase().indexOf(q) !== -1 || (c.phone || '').indexOf(q) !== -1 || (c.code || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  list = list.slice(0, 40);
+  var wrap = document.getElementById('repClientResults');
+  if (list.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:14px;">لا يوجد عملاء مطابقين</div>'; return; }
+  wrap.innerHTML = list.map(function(c){
+    return '<div onclick="openRepClientActions(&#39;' + String(c.code).replace(/'/g,"\\'") + '&#39;)" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">' +
+      '<div style="font-size:12px;font-weight:800;">' + (c.name || c.code) + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + (c.address || c.phone || '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function openRepClientActions(code){
+  var cust = allCustomers.find(function(c){ return String(c.code) === String(code); });
+  if (!cust) return;
+  repTargetCustomer = cust;
+  document.getElementById('repClientActionsName').textContent = cust.name || cust.code;
+  openModalOverlay('repClientActionsModal');
+}
+
+// ==================== زيارات المندوب ====================
+function openRepVisitModal(){
+  if (!repTargetCustomer) return;
+  closeModalOverlay('repClientActionsModal');
+  document.getElementById('repVisitClientName').textContent = 'العميل: ' + (repTargetCustomer.name || repTargetCustomer.code);
+  repVisitStatusValue = '';
+  document.getElementById('repVisitPurpose').value = '';
+  document.getElementById('repVisitNotes').value = '';
+  document.getElementById('repVisitLocationStatus').textContent = '';
+  document.getElementById('repVisitSuccessBtn').style.opacity = '1';
+  document.getElementById('repVisitFailBtn').style.opacity = '1';
+  repPendingLocation = null;
+  openModalOverlay('repVisitModal');
+}
+
+function setRepVisitStatus(status){
+  repVisitStatusValue = status;
+  document.getElementById('repVisitSuccessBtn').style.opacity = status === 'ناجحة' ? '1' : '0.5';
+  document.getElementById('repVisitFailBtn').style.opacity = status === 'غير ناجحة' ? '1' : '0.5';
+}
+
+function captureRepVisitLocation(){
+  if (!navigator.geolocation) { showToast('الجهاز لا يدعم تحديد الموقع'); return; }
+  document.getElementById('repVisitLocationStatus').textContent = 'جاري تحديد الموقع...';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    repPendingLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    document.getElementById('repVisitLocationStatus').textContent = 'تم تسجيل الموقع ✅';
+  }, function(err){
+    document.getElementById('repVisitLocationStatus').textContent = 'تعذر تحديد الموقع';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function saveRepVisit(){
+  if (!repVisitStatusValue) { showToast('اختر حالة الزيارة'); return; }
+  if (!repTargetCustomer) return;
+  var cust = repTargetCustomer;
+  var purpose = document.getElementById('repVisitPurpose').value.trim();
+  var notes = document.getElementById('repVisitNotes').value.trim();
+  var visit = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    date: new Date().toISOString(),
+    customerCode: cust.code, customerName: cust.name || cust.code,
+    repUsername: currentRep ? currentRep.code : '',
+    repFullName: currentRep ? currentRep.name : '',
+    status: repVisitStatusValue, purpose: purpose, notes: notes,
+    repLocation: repPendingLocation || null,
+    customerLocation: (cust.location || repPendingLocation || null)
+  };
+  repVisits.unshift(visit);
+  localStorage.setItem('app_rep_visits', JSON.stringify(repVisits));
+  if (db) {
+    db.collection('customerVisitRecords').doc(String(visit.id)).set(visit).catch(function(e){ console.error('visit sync failed:', e); });
+    // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
+    if (!cust.location && repPendingLocation) {
+      cust.location = repPendingLocation;
+      db.collection('storeData').doc('main').get().then(function(docSnap){
+        if (!docSnap.exists) return;
+        var data = docSnap.data();
+        var custList = data.customers || [];
+        var idx = custList.findIndex(function(c){ return String(c.code) === String(cust.code); });
+        if (idx !== -1) {
+          custList[idx].location = repPendingLocation;
+          db.collection('storeData').doc('main').update({ customers: custList }).catch(function(e){ console.error('customer location update failed:', e); });
+        }
+      });
+    }
+  }
+  closeModalOverlay('repVisitModal');
+  showToast('تم حفظ الزيارة ✓');
+  renderRepVisitsList();
+}
+
+function renderRepVisitsList(){
+  var wrap = document.getElementById('repVisitsList');
+  if (!wrap) return;
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; }).slice(0, 20);
+  if (mine.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">لا توجد زيارات مسجلة بعد</div>'; return; }
+  wrap.innerHTML = mine.map(function(v){
+    var d = new Date(v.date);
+    var statusColor = v.status === 'ناجحة' ? '#2e8b57' : '#c0392b';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;">' +
+      '<div style="display:flex;justify-content:space-between;">' +
+        '<span style="font-size:11.5px;font-weight:800;">' + v.customerName + '</span>' +
+        '<span style="font-size:10px;font-weight:800;color:' + statusColor + ';">' + v.status + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:3px;">' + d.toLocaleString('ar-EG') + (v.purpose ? (' - ' + v.purpose) : '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ==================== إنشاء طلب نيابة عن التاجر ====================
+function startRepOrderFlow(){
+  if (!repTargetCustomer) return;
+  closeModalOverlay('repClientActionsModal');
+  cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
+  document.getElementById('repOrderBanner').style.display = 'flex';
+  document.getElementById('repOrderBanner').classList.remove('hidden');
+  document.getElementById('repOrderBannerName').textContent = repTargetCustomer.name || repTargetCustomer.code;
+  var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
+  switchScreenRaw('home');
+  renderHome();
+}
+
+function cancelRepOrderFlow(){
+  repTargetCustomer = null;
+  cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
+  document.getElementById('repOrderBanner').style.display = 'none';
+  var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
+  switchScreenRaw('repHome');
+  renderRepHome();
+}
+
 
 function enterAsGuest(){
   isGuest = true;
@@ -878,6 +1197,7 @@ function promptGuestLogin(){
 function startApp(){
   document.getElementById('loginScreen').classList.remove('active');
   document.getElementById('registerScreen').classList.remove('active');
+  document.getElementById('repLoginScreen').classList.remove('active');
   document.getElementById('appRoot').classList.remove('hidden');
   document.getElementById('welcomeName').textContent = isGuest ? 'زائر' : (customerProfile && customerProfile.customerName ? customerProfile.customerName : ('عميل ' + customerPhone));
   document.getElementById('accountCustomerName').textContent = isGuest ? 'لسه مسجّلتش دخول' : (customerProfile && customerProfile.customerName ? customerProfile.customerName : 'بيانات غير مكتملة بعد');
@@ -889,11 +1209,18 @@ function startApp(){
   loadMyOrders();
   loadLoyaltyPoints();
   updateCartBadge();
-  renderHome();
+  if (repMode) {
+    document.getElementById('topTabsBar').style.display = 'none';
+    var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
+    switchScreenRaw('repHome');
+    renderRepHome();
+  } else {
+    renderHome();
+  }
   renderAdBanners();
   showLoading(false);
   initCloud();
-  initOneSignalForCustomer();
+  if (!repMode) initOneSignalForCustomer();
 }
 
 function listenMyOrders(){
@@ -917,6 +1244,7 @@ function loadMyOrders(){
 }
 
 function getMyLoyaltyPoints(){
+  if (repMode && repTargetCustomer) return repTargetCustomer.loyaltyPoints || 0;
   var customers = getStorage('customers', []);
   for (var i = 0; i < customers.length; i++){ if (customers[i].code === customerPhone) return customers[i].loyaltyPoints || 0; }
   return 0;
@@ -936,9 +1264,14 @@ function loadLoyaltyPoints(){
 function getStock(code){ return stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999; }
 function inStockOnly(list){ return list.filter(function(p){ return getStock(p.code) > 0; }); }
 
-function switchScreen(name){
+function switchScreenRaw(name){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById(name + 'Screen').classList.add('active');
+  window.scrollTo(0,0);
+}
+function switchScreen(name){
+  if (repMode && name === 'home' && !repTargetCustomer) { switchScreenRaw('repHome'); renderRepHome(); return; }
+  switchScreenRaw(name);
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   if (name === 'home') document.getElementById('navHome').classList.add('active');
   if (name === 'offers') document.getElementById('navOffers').classList.add('active');
@@ -946,7 +1279,6 @@ function switchScreen(name){
   if (name === 'favorites') renderFavorites();
   if (name === 'offers') renderOffers();
   if (name === 'confirm') renderConfirm();
-  window.scrollTo(0,0);
 }
 function switchTopTab(tab){
   document.querySelectorAll('.top-tab').forEach(function(b){b.classList.toggle('active', b.dataset.toptab === tab);});
@@ -1356,6 +1688,7 @@ function setDeliveryTime(t){
 }
 
 function proceedToConfirmOrder(){
+  if (repMode && repTargetCustomer) { sendOrderToServer(); return; }
   if (!customerProfile || !customerProfile.customerName || !customerProfile.shopName || !customerProfile.addressDetail){
     document.getElementById('profCustomerName').value = customerProfile && customerProfile.customerName ? customerProfile.customerName : '';
     document.getElementById('profShopName').value = customerProfile && customerProfile.shopName ? customerProfile.shopName : '';
@@ -1404,7 +1737,30 @@ function sendOrderToServer(){
   var pv = loyaltySettings.pointValue || 1;
   var pointsRedeemed = discount > 0 ? Math.min(getMyLoyaltyPoints(), Math.ceil(discount / pv)) : 0;
   var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-  var order = {
+  var isRepOrder = repMode && repTargetCustomer;
+  var order = isRepOrder ? {
+    id: orderId,
+    customerCode: repTargetCustomer.code,
+    customerName: repTargetCustomer.name || repTargetCustomer.code,
+    shopName: repTargetCustomer.shopName || repTargetCustomer.name || '',
+    addressDetail: repTargetCustomer.address || repTargetCustomer.addressDetail || '',
+    neighborhood: repTargetCustomer.neighborhood || '',
+    city: repTargetCustomer.city || '',
+    governorate: repTargetCustomer.governorate || '',
+    location: repTargetCustomer.location || null,
+    phone: repTargetCustomer.phone || repTargetCustomer.code,
+    deliveryTime: deliveryTime,
+    items: items,
+    subtotal: cartTotal,
+    pointsRedeemed: pointsRedeemed,
+    discountFromPoints: discount,
+    total: cartTotal - discount,
+    status: 'pending',
+    createdAt: Date.now(),
+    repCode: currentRep ? currentRep.code : '',
+    repName: currentRep ? currentRep.name : '',
+    source: 'rep'
+  } : {
     id: orderId,
     customerCode: customerPhone,
     customerName: customerProfile.customerName,
@@ -1434,7 +1790,17 @@ function sendOrderToServer(){
     updateCartBadge();
     showLoading(false);
     showToast(pointsRedeemed > 0 ? ('تم إرسال الطلب بنجاح ✓ وهيتخصم ' + pointsRedeemed + ' نقطة بعد التنفيذ') : 'تم إرسال الطلب بنجاح ✓');
-    switchTopTab('home'); switchScreen('home');
+    if (isRepOrder) {
+      var doneForName = repTargetCustomer.name || repTargetCustomer.code;
+      repTargetCustomer = null;
+      document.getElementById('repOrderBanner').style.display = 'none';
+      var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
+      switchScreenRaw('repHome');
+      renderRepHome();
+      showToast('تم إرسال الطلب لصالح ' + doneForName + ' بنجاح ✓');
+    } else {
+      switchTopTab('home'); switchScreen('home');
+    }
   }).catch(function(err){
     console.error('Order send failed:', err);
     showLoading(false);
@@ -1572,7 +1938,7 @@ function hideSplash(){
   var splash = document.getElementById('splashScreen');
   splash.classList.add('fade-out');
   setTimeout(function(){ splash.style.display = 'none'; }, 500);
-  if (customerPhone || isGuest){ startApp(); }
+  if (customerPhone || isGuest || repMode){ if (repMode) isGuest = true; startApp(); }
   else {
     document.getElementById('loginScreen').classList.add('active');
     initCloud(); // نفعّل الاتصال بالسحابة من هنا عشان db يبقى جاهز لحظة ما المستخدم يدوس تسجيل الدخول/إنشاء حساب
