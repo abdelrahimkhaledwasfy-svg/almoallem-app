@@ -1199,7 +1199,7 @@ function startApp(){
   document.getElementById('registerScreen').classList.remove('active');
   document.getElementById('repLoginScreen').classList.remove('active');
   document.getElementById('appRoot').classList.remove('hidden');
-  document.getElementById('welcomeName').textContent = isGuest ? 'زائر' : (customerProfile && customerProfile.customerName ? customerProfile.customerName : ('عميل ' + customerPhone));
+  document.getElementById('welcomeName').textContent = repMode ? ('مندوب: ' + (currentRep ? currentRep.name : '')) : (isGuest ? 'زائر' : (customerProfile && customerProfile.customerName ? customerProfile.customerName : ('عميل ' + customerPhone)));
   document.getElementById('accountCustomerName').textContent = isGuest ? 'لسه مسجّلتش دخول' : (customerProfile && customerProfile.customerName ? customerProfile.customerName : 'بيانات غير مكتملة بعد');
   document.getElementById('accountPhone').textContent = isGuest ? '-' : customerPhone;
   document.body.classList.toggle('guest-mode', !!isGuest);
@@ -1519,11 +1519,7 @@ function productCardHtml(p){
   var isFav = favorites.includes(p.code);
   var imgHtml = p.imageUrl ? '<img src="' + p.imageUrl + '" class="pcard-img">' : '<div class="pcard-img-fallback"><i class="fas fa-box-open"></i></div>';
 
-  if (isGuest) {
-    return '<div class="pcard ' + (oos ? 'oos' : '') + '">' +
-        '<div class="pcard-img-wrap">' + imgHtml +
-        (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : '')) +
-        '<button class="pcard-add" onclick="promptGuestLogin()"><i class="fas fa-lock"></i></button></div>' +
+  if (isGuest && !repMode) {
         '<div class="pcard-body">' +
         '<div class="pcard-price" style="color:var(--muted);font-size:11px;">سجّل دخول لعرض السعر</div>' +
         '<div class="pcard-name">' + p.name + '</div></div></div>';
@@ -1558,7 +1554,7 @@ function productCardHtml(p){
 }
 
 function addToCart(code, unit, qty){
-  if (isGuest) { promptGuestLogin(); return; }
+  if (isGuest && !repMode) { promptGuestLogin(); return; }
   var p = products.find(function(x){return x.code === code;});
   if (!p) return;
   var stock = getStock(code);
