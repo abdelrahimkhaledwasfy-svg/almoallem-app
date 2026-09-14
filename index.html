@@ -744,7 +744,7 @@ let currentRatingOrderId = null, currentRatingStars = 5;
 let regLocationCoords = null;
 let isGuest = localStorage.getItem('app_guest_mode') === '1';
 let editingProfile = false;
-const MIN_ORDER_AMOUNT = 100;
+const MIN_ORDER_AMOUNT = 1000;
 
 // ==================== وضع مندوب (زيارات + طلب نيابة عن تاجر) ====================
 let allCustomers = getStorage('customers', []); // كل عملاء المعلم - يستخدمها المندوب للاختيار منها
@@ -1751,10 +1751,12 @@ function renderCart(){
   }).join('');
 
   var total = getCartTotal();
-  var belowMin = total < MIN_ORDER_AMOUNT;
+  var openOrder = (!repMode && customerPhone) ? myOrders.find(function(o){ return o.status === 'pending'; }) : null;
+  var belowMin = total < MIN_ORDER_AMOUNT && !openOrder;
   html += '<div style="height:140px;"></div>' +
       '<div class="cart-footer">' +
-      (belowMin ? '<div style="font-size:10.5px;font-weight:800;color:var(--danger);text-align:center;margin-bottom:8px;">الحد الأدنى للطلب ' + MIN_ORDER_AMOUNT + ' ج.م — ناقصك ' + money(MIN_ORDER_AMOUNT - total) + ' ج.م كمان</div>' : '') +
+      (belowMin ? '<div style="font-size:10.5px;font-weight:800;color:var(--danger);text-align:center;margin-bottom:8px;">الحد الأدنى للطلب ' + MIN_ORDER_AMOUNT + ' ج.م — ناقصك ' + money(MIN_ORDER_AMOUNT - total) + ' ج.م كمان</div>' :
+       (openOrder && total < MIN_ORDER_AMOUNT ? '<div style="font-size:10.5px;font-weight:800;color:var(--maroon);text-align:center;margin-bottom:8px;">هتتضاف الأصناف دي لطلبك السابق رقم #' + openOrder.id.slice(-6) + ' اللي لسه في انتظار التجهيز</div>' : '')) +
       '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:8px;"><span>الإجمالي</span><span style="font-weight:900;">' + money(total) + ' ج.م</span></div>' +
       '<button class="btn-primary" ' + (belowMin ? 'disabled' : '') + ' onclick="switchScreen(&#39;confirm&#39;)">متابعة الطلب</button></div>';
   wrap.innerHTML = html;
@@ -1869,8 +1871,37 @@ function sendOrderToServer(){
   var discount = getRedeemDiscount();
   var pv = loyaltySettings.pointValue || 1;
   var pointsRedeemed = discount > 0 ? Math.min(getMyLoyaltyPoints(), Math.ceil(discount / pv)) : 0;
-  var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var isRepOrder = repMode && repTargetCustomer;
+  var openOrder = (!isRepOrder && customerPhone) ? myOrders.find(function(o){ return o.status === 'pending'; }) : null;
+
+  if (openOrder) {
+    // العميل عنده طلب لسه "جديد" (أمين المخزن ما بدأش يشتغل عليه) - نضيف الأصناف دي له بدل ما نعمل طلب منفصل جديد
+    var mergedItems = (openOrder.items || []).map(function(it){ return Object.assign({}, it); });
+    items.forEach(function(newIt){
+      var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
+      if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
+      else { mergedItems.push(newIt); }
+    });
+    var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
+    var mergedDiscount = openOrder.discountFromPoints || 0;
+    db.collection('customerOrders').doc(openOrder.id).update({
+      items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount
+    }).then(function(){
+      cart = {};
+      localStorage.setItem('app_cart', '{}');
+      updateCartBadge();
+      showLoading(false);
+      showToast('تمت إضافة الأصناف لطلبك السابق #' + openOrder.id.slice(-6) + ' ✓');
+      switchTopTab('home'); switchScreen('home');
+    }).catch(function(err){
+      console.error('Order merge failed:', err);
+      showLoading(false);
+      showToast('تعذر تحديث الطلب، حاول تاني', 'error');
+    });
+    return;
+  }
+
+  var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var order = isRepOrder ? {
     id: orderId,
     customerCode: repTargetCustomer.code,
