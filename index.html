@@ -189,6 +189,43 @@
   .invoice-row .imeta{font-size:9.5px;color:var(--muted);margin-top:2px;}
   .invoice-totals-row{display:flex;justify-content:space-between;font-size:11px;color:#5B4432;padding:5px 0;}
   .invoice-totals-row.grand{font-size:13.5px;font-weight:900;color:var(--maroon);border-top:1px solid var(--border);margin-top:6px;padding-top:10px;}
+
+  /* ============ وضع المندوب (مبيعات وتسليم) ============ */
+  .rep-stats-row{position:relative;display:flex;gap:10px;margin-top:14px;}
+  .rep-stat{flex:1;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 8px;text-align:center;}
+  .rep-stat b{display:block;font-size:17px;font-weight:900;color:#fff;}
+  .rep-stat span{display:block;font-size:9px;color:#E3B9B0;margin-top:2px;font-weight:700;}
+  .rep-field{margin-bottom:14px;}
+  .rep-field label{display:block;font-size:11px;font-weight:800;color:#5B4432;margin-bottom:6px;}
+  .rep-input-wrap{position:relative;}
+  .rep-input-wrap input,.rep-input-wrap select{width:100%;padding:12px 40px 12px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--card);font-size:12.5px;font-weight:700;font-family:inherit;color:var(--ink);}
+  .rep-input-wrap input:focus{outline:none;border-color:var(--gold);}
+  .rep-input-wrap i{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--maroon);font-size:14px;}
+  .client-card{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:11px 13px;margin-bottom:9px;cursor:pointer;box-shadow:0 2px 8px rgba(122,31,31,0.05);transition:transform .12s;}
+  .client-card:active{transform:scale(0.98);}
+  .client-avatar{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));}
+  .client-info{flex:1;min-width:0;}
+  .client-name{font-size:12.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .client-meta{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);margin-top:3px;}
+  .client-meta i{font-size:9px;width:11px;}
+  .client-visit-badge{font-size:9px;font-weight:800;color:var(--success);background:#E9F5EC;padding:3px 8px;border-radius:99px;white-space:nowrap;}
+  .client-arrow{color:var(--muted);font-size:12px;flex-shrink:0;}
+  .rep-action-btn{display:flex;align-items:center;gap:12px;width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;text-align:right;}
+  .rep-action-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;color:#fff;}
+  .rep-action-title{font-size:12.5px;font-weight:800;color:var(--ink);}
+  .rep-action-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+  .visit-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:8px;}
+  .visit-card-top{display:flex;justify-content:space-between;align-items:center;}
+  .visit-status-chip{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:99px;}
+  .visit-status-chip.ok{background:#E9F5EC;color:var(--success);}
+  .visit-status-chip.no{background:#FBE3C9;color:var(--danger);}
+  .delivery-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:13px;margin-bottom:10px;box-shadow:0 2px 10px rgba(122,31,31,0.06);}
+  .delivery-status-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:9.5px;font-weight:800;white-space:nowrap;}
+  .delivery-status-chip.wait{background:#E7F0FF;color:#2A5EA8;}
+  .delivery-status-chip.fail{background:#FBE3C9;color:var(--danger);}
+  .rep-empty{text-align:center;padding:28px 16px;color:var(--muted);}
+  .rep-empty i{font-size:30px;opacity:.35;margin-bottom:8px;display:block;}
+  .rep-empty p{font-size:11px;font-weight:700;}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .modal-overlay{position:fixed;inset:0;background:rgba(36,21,18,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
@@ -353,35 +390,45 @@
         </div>
         <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
+      <div class="rep-stats-row">
+        <div class="rep-stat"><b id="repStatVisits">0</b><span>زيارات النهاردة</span></div>
+        <div class="rep-stat"><b id="repStatSuccess">0</b><span>زيارات ناجحة</span></div>
+        <div class="rep-stat"><b id="repStatLast">-</b><span>آخر نشاط</span></div>
+      </div>
     </div>
 
-    <div style="margin:14px 16px;">
-      <div class="field">
+    <div style="margin:16px 16px 0;">
+      <div class="rep-field">
         <label>اختر التاجر</label>
-        <div class="input-wrap">
+        <div class="rep-input-wrap">
           <input type="text" id="repClientSearch" placeholder="اكتب اسم التاجر أو رقم الهاتف..." oninput="renderRepClientResults()">
           <i class="fas fa-magnifying-glass"></i>
         </div>
       </div>
-      <div id="repClientResults" style="margin-top:8px;max-height:260px;overflow-y:auto;"></div>
+      <div id="repClientResults" style="max-height:260px;overflow-y:auto;"></div>
     </div>
 
-    <div style="margin:18px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);"><i class="fas fa-route"></i> آخر زياراتي</div>
+    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-route"></i> آخر زياراتي</div>
     <div id="repVisitsList" style="margin:0 16px 24px;"></div>
   </div>
 
   <div id="deliveryHomeScreen" class="screen">
     <div class="welcome-card">
       <div class="welcome-row">
-        <div class="avatar-badge">م</div>
+        <div class="avatar-badge"><i class="fas fa-truck" style="font-size:15px;"></i></div>
         <div style="flex:1;">
           <div class="welcome-sub">أهلاً بيك يا مندوب تسليم</div>
           <div class="welcome-name" id="deliveryWelcomeName">-</div>
         </div>
         <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
+      <div class="rep-stats-row">
+        <div class="rep-stat"><b id="deliveryStatPending">0</b><span>بانتظار التسليم</span></div>
+        <div class="rep-stat"><b id="deliveryStatDone">0</b><span>تم تسليمه النهاردة</span></div>
+        <div class="rep-stat"><b id="deliveryStatTotal">0</b><span>إجمالي المحصّل</span></div>
+      </div>
     </div>
-    <div style="margin:14px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
+    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
     <div id="deliveryInvoicesList" style="margin:0 16px 24px;"></div>
   </div>
 
@@ -573,12 +620,24 @@
 
 <div class="modal-overlay" id="repClientActionsModal">
   <div class="modal-sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:13px;font-weight:900;color:var(--maroon);" id="repClientActionsName">-</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="client-avatar" id="repClientActionsAvatar" style="width:38px;height:38px;font-size:13px;">-</div>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:var(--ink);" id="repClientActionsName">-</div>
+          <div style="font-size:10px;color:var(--muted);" id="repClientActionsMeta">-</div>
+        </div>
+      </div>
       <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
     </div>
-    <button class="btn-primary" style="width:100%;margin-bottom:10px;" onclick="openRepVisitModal()"><i class="fas fa-route"></i> زيارة جديدة</button>
-    <button class="btn-primary" style="width:100%;" onclick="startRepOrderFlow()"><i class="fas fa-cart-shopping"></i> تصفح المنتجات وإنشاء طلب</button>
+    <button class="rep-action-btn" onclick="openRepVisitModal()">
+      <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));"><i class="fas fa-route"></i></div>
+      <div><div class="rep-action-title">تسجيل زيارة جديدة</div><div class="rep-action-sub">سجّل حالة الزيارة وموقعك الحالي</div></div>
+    </button>
+    <button class="rep-action-btn" style="margin-bottom:0;" onclick="startRepOrderFlow()">
+      <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--gold),#A9780F);"><i class="fas fa-cart-shopping"></i></div>
+      <div><div class="rep-action-title">تصفح المنتجات وإنشاء طلب</div><div class="rep-action-sub">اطلب نيابة عن التاجر ده</div></div>
+    </button>
   </div>
 </div>
 
@@ -588,22 +647,22 @@
       <div style="font-size:13px;font-weight:900;color:var(--maroon);">زيارة جديدة</div>
       <button onclick="closeModalOverlay('repVisitModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
     </div>
-    <div style="font-size:11.5px;font-weight:800;margin-bottom:10px;" id="repVisitClientName">-</div>
-    <div class="field">
+    <div style="font-size:11.5px;font-weight:800;margin-bottom:14px;color:var(--muted);" id="repVisitClientName">-</div>
+    <div class="rep-field">
       <label>حالة الزيارة</label>
       <div style="display:flex;gap:8px;">
-        <button type="button" id="repVisitSuccessBtn" onclick="setRepVisitStatus('ناجحة')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #2e8b57;background:#eafaf0;color:#2e8b57;font-weight:800;font-size:11px;">✅ ناجحة</button>
-        <button type="button" id="repVisitFailBtn" onclick="setRepVisitStatus('غير ناجحة')" style="flex:1;padding:10px;border-radius:10px;border:2px solid #c0392b;background:#fdecea;color:#c0392b;font-weight:800;font-size:11px;">❌ غير ناجحة</button>
+        <button type="button" id="repVisitSuccessBtn" onclick="setRepVisitStatus('ناجحة')" style="flex:1;padding:11px;border-radius:12px;border:2px solid #2e8b57;background:#eafaf0;color:#2e8b57;font-weight:800;font-size:11.5px;"><i class="fas fa-circle-check"></i> ناجحة</button>
+        <button type="button" id="repVisitFailBtn" onclick="setRepVisitStatus('غير ناجحة')" style="flex:1;padding:11px;border-radius:12px;border:2px solid #c0392b;background:#fdecea;color:#c0392b;font-weight:800;font-size:11.5px;"><i class="fas fa-circle-xmark"></i> غير ناجحة</button>
       </div>
     </div>
-    <div class="field"><label>سبب الزيارة</label><input type="text" id="repVisitPurpose" placeholder="مثال: متابعة طلب، تحصيل..."></div>
-    <div class="field"><label>ملاحظات</label><textarea class="form-textarea" id="repVisitNotes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea></div>
-    <div class="field">
+    <div class="rep-field"><label>سبب الزيارة</label><input class="form-input" type="text" id="repVisitPurpose" placeholder="مثال: متابعة طلب، تحصيل..."></div>
+    <div class="rep-field"><label>ملاحظات</label><textarea class="form-textarea" id="repVisitNotes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea></div>
+    <div class="rep-field">
       <label>الموقع</label>
       <button class="map-btn" type="button" onclick="captureRepVisitLocation()"><i class="fas fa-location-dot"></i> <span>تسجيل موقعي الحالي</span></button>
-      <div id="repVisitLocationStatus" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
+      <div id="repVisitLocationStatus" style="font-size:10px;color:var(--muted);margin-top:6px;"></div>
     </div>
-    <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveRepVisit()">حفظ الزيارة</button>
+    <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveRepVisit()"><i class="fas fa-save"></i> حفظ الزيارة</button>
   </div>
 </div>
 
@@ -614,7 +673,7 @@
       <button onclick="closeModalOverlay('deliveryRejectModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
     </div>
     <input type="hidden" id="deliveryRejectInvoiceId">
-    <div class="field">
+    <div class="rep-field">
       <label>السبب</label>
       <select class="form-input" id="deliveryRejectReasonSelect">
         <option value="العميل غير موجود">العميل غير موجود</option>
@@ -622,8 +681,8 @@
         <option value="سبب آخر">سبب آخر</option>
       </select>
     </div>
-    <div class="field"><label>تفاصيل إضافية</label><textarea class="form-textarea" id="deliveryRejectReasonDetail" rows="2"></textarea></div>
-    <button class="btn-primary" style="width:100%;background:var(--danger);" onclick="confirmDeliveryReject()">تأكيد عدم التسليم</button>
+    <div class="rep-field"><label>تفاصيل إضافية</label><textarea class="form-textarea" id="deliveryRejectReasonDetail" rows="2"></textarea></div>
+    <button class="btn-primary" style="width:100%;background:var(--danger);" onclick="confirmDeliveryReject()"><i class="fas fa-circle-xmark"></i> تأكيد عدم التسليم</button>
   </div>
 </div>
 
@@ -959,11 +1018,41 @@ function refreshRepScreensIfNeeded(){
   }
 }
 
+function avatarInitial(name){
+  var n = (name || '').trim();
+  return n ? n.charAt(0) : '؟';
+}
+function avatarColor(seed){
+  var colors = ['#7A1F1F','#A9780F','#2E7D42','#2A5EA8','#7A4A9A','#B23A2E'];
+  var s = String(seed || '').split('').reduce(function(a,c){ return a + c.charCodeAt(0); }, 0);
+  return colors[s % colors.length];
+}
+function timeAgoAr(ts){
+  if (!ts) return '-';
+  var diff = Math.max(0, Date.now() - new Date(ts).getTime());
+  var mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'الآن';
+  if (mins < 60) return 'من ' + mins + ' د';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return 'من ' + hrs + ' س';
+  return 'من ' + Math.floor(hrs / 24) + ' يوم';
+}
+
 function renderRepHome(){
   document.getElementById('repWelcomeName').textContent = currentRep ? currentRep.name : '-';
   document.getElementById('repClientSearch').value = '';
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; });
+  var today = new Date().toDateString();
+  var todayVisits = mine.filter(function(v){ return new Date(v.date).toDateString() === today; });
+  document.getElementById('repStatVisits').textContent = todayVisits.length;
+  document.getElementById('repStatSuccess').textContent = todayVisits.filter(function(v){ return v.status === 'ناجحة'; }).length;
+  document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
   renderRepClientResults();
   renderRepVisitsList();
+}
+
+function lastVisitFor(code){
+  return repVisits.find(function(v){ return String(v.customerCode) === String(code); });
 }
 
 function renderRepClientResults(){
@@ -976,11 +1065,17 @@ function renderRepClientResults(){
   }
   list = list.slice(0, 40);
   var wrap = document.getElementById('repClientResults');
-  if (list.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:14px;">لا يوجد عملاء مطابقين</div>'; return; }
+  if (list.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-magnifying-glass"></i><p>لا يوجد عملاء مطابقين</p></div>'; return; }
   wrap.innerHTML = list.map(function(c){
-    return '<div onclick="openRepClientActions(&#39;' + String(c.code).replace(/'/g,"\\'") + '&#39;)" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">' +
-      '<div style="font-size:12px;font-weight:800;">' + (c.name || c.code) + '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + (c.address || c.phone || '') + '</div>' +
+    var lv = lastVisitFor(c.code);
+    return '<div class="client-card" onclick="openRepClientActions(&#39;' + String(c.code).replace(/'/g,"\\'") + '&#39;)">' +
+      '<div class="client-avatar" style="background:' + avatarColor(c.code) + ';">' + avatarInitial(c.name || c.code) + '</div>' +
+      '<div class="client-info">' +
+        '<div class="client-name">' + (c.name || c.code) + '</div>' +
+        '<div class="client-meta">' + (c.phone ? '<i class="fas fa-phone"></i> ' + c.phone : (c.address ? '<i class="fas fa-location-dot"></i> ' + c.address : '')) + '</div>' +
+      '</div>' +
+      (lv ? '<span class="client-visit-badge">زيارة ' + timeAgoAr(lv.date) + '</span>' : '') +
+      '<i class="fas fa-chevron-left client-arrow"></i>' +
     '</div>';
   }).join('');
 }
@@ -990,6 +1085,10 @@ function openRepClientActions(code){
   if (!cust) return;
   repTargetCustomer = cust;
   document.getElementById('repClientActionsName').textContent = cust.name || cust.code;
+  document.getElementById('repClientActionsMeta').textContent = cust.phone || cust.address || '';
+  var av = document.getElementById('repClientActionsAvatar');
+  av.textContent = avatarInitial(cust.name || cust.code);
+  av.style.background = avatarColor(cust.code);
   openModalOverlay('repClientActionsModal');
 }
 
@@ -1019,7 +1118,7 @@ function captureRepVisitLocation(){
   document.getElementById('repVisitLocationStatus').textContent = 'جاري تحديد الموقع...';
   navigator.geolocation.getCurrentPosition(function(pos){
     repPendingLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    document.getElementById('repVisitLocationStatus').textContent = 'تم تسجيل الموقع ✅';
+    document.getElementById('repVisitLocationStatus').innerHTML = '<span style="color:var(--success);"><i class="fas fa-check-circle"></i> تم تسجيل الموقع</span>';
   }, function(err){
     document.getElementById('repVisitLocationStatus').textContent = 'تعذر تحديد الموقع';
   }, { enableHighAccuracy: true, timeout: 10000 });
@@ -1062,23 +1161,23 @@ function saveRepVisit(){
   }
   closeModalOverlay('repVisitModal');
   showToast('تم حفظ الزيارة ✓');
-  renderRepVisitsList();
+  renderRepHome();
 }
 
 function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
   var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; }).slice(0, 20);
-  if (mine.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">لا توجد زيارات مسجلة بعد</div>'; return; }
+  if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
     var d = new Date(v.date);
-    var statusColor = v.status === 'ناجحة' ? '#2e8b57' : '#c0392b';
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;">' +
-      '<div style="display:flex;justify-content:space-between;">' +
+    var ok = v.status === 'ناجحة';
+    return '<div class="visit-card">' +
+      '<div class="visit-card-top">' +
         '<span style="font-size:11.5px;font-weight:800;">' + v.customerName + '</span>' +
-        '<span style="font-size:10px;font-weight:800;color:' + statusColor + ';">' + v.status + '</span>' +
+        '<span class="visit-status-chip ' + (ok ? 'ok' : 'no') + '"><i class="fas fa-' + (ok ? 'circle-check' : 'circle-xmark') + '"></i> ' + v.status + '</span>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:3px;">' + d.toLocaleString('ar-EG') + (v.purpose ? (' - ' + v.purpose) : '') + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + (v.purpose ? (' — ' + v.purpose) : '') + '</div>' +
     '</div>';
   }).join('');
 }
@@ -1119,34 +1218,54 @@ function startDeliveryInvoicesListener(){
   }, function(err){ console.error('Delivery invoices listener error:', err); });
 }
 
+let deliveryHistoryInvoices = [];
+let deliveryHistoryListenerStarted = false;
+function startDeliveryHistoryListener(){
+  if (!db || deliveryHistoryListenerStarted || !currentRep) return;
+  deliveryHistoryListenerStarted = true;
+  db.collection('invoiceRecords').where('deliveredBy', '==', currentRep.code).onSnapshot(function(snap){
+    deliveryHistoryInvoices = snap.docs.map(function(d){ return d.data(); });
+    renderDeliveryHome();
+  }, function(err){ console.error('Delivery history listener error:', err); });
+}
+
 function renderDeliveryHome(){
   document.getElementById('deliveryWelcomeName').textContent = currentRep ? currentRep.name : '-';
+  var todayStr = new Date().toDateString();
+  var doneToday = deliveryHistoryInvoices.filter(function(i){ return i.deliveredAt && new Date(i.deliveredAt).toDateString() === todayStr; });
+  var totalCollected = doneToday.reduce(function(s, i){ return s + (i.grandTotal || i.total || 0); }, 0);
+  document.getElementById('deliveryStatPending').textContent = deliveryInvoices.filter(function(i){ return i.deliveryStatus === 'بانتظار التسليم'; }).length;
+  document.getElementById('deliveryStatDone').textContent = doneToday.length;
+  document.getElementById('deliveryStatTotal').textContent = money(totalCollected);
   renderDeliveryInvoicesList();
 }
 
 function renderDeliveryInvoicesList(){
   var wrap = document.getElementById('deliveryInvoicesList');
   if (!wrap) return;
-  if (deliveryInvoices.length === 0) { wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:20px;">لا توجد فواتير جاهزة للتسليم حاليًا</div>'; return; }
+  if (deliveryInvoices.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-truck"></i><p>لا توجد فواتير جاهزة للتسليم حاليًا</p></div>'; return; }
   wrap.innerHTML = deliveryInvoices.map(function(inv){
     var pending = inv.deliveryStatus === 'بانتظار التسليم';
-    var statusHtml = pending ? '<span style="background:#E7F0FF;color:#2A5EA8;padding:3px 8px;border-radius:8px;font-size:9.5px;font-weight:800;">بانتظار التسليم</span>'
-      : '<span style="background:#FBE3C9;color:var(--danger);padding:3px 8px;border-radius:8px;font-size:9.5px;font-weight:800;">لم يتم: ' + (inv.deliveryRejectReason || '') + '</span>';
+    var statusHtml = pending ? '<span class="delivery-status-chip wait"><i class="fas fa-clock"></i> بانتظار التسليم</span>'
+      : '<span class="delivery-status-chip fail"><i class="fas fa-triangle-exclamation"></i> لم يتم: ' + (inv.deliveryRejectReason || '') + '</span>';
     var addr = inv.addressDetail || inv.shopName || '';
-    var mapBtn = (inv.location && inv.location.lat) ? ('<a href="https://maps.google.com/?q=' + inv.location.lat + ',' + inv.location.lng + '" target="_blank" style="font-size:10px;color:var(--maroon);font-weight:800;"><i class="fas fa-location-dot"></i> فتح الموقع على الخريطة</a>') : '';
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-        '<div><div style="font-size:12.5px;font-weight:900;">' + (inv.customerName || '') + '</div>' +
-        '<div style="font-size:10px;color:var(--muted);margin-top:2px;">' + addr + '</div></div>' +
+    var mapBtn = (inv.location && inv.location.lat) ? ('<a href="https://maps.google.com/?q=' + inv.location.lat + ',' + inv.location.lng + '" target="_blank" style="font-size:10px;color:var(--maroon);font-weight:800;"><i class="fas fa-location-dot"></i> فتح الموقع على الخريطة</a>') : '<span></span>';
+    return '<div class="delivery-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+        '<div style="display:flex;gap:10px;align-items:center;min-width:0;">' +
+          '<div class="client-avatar" style="background:' + avatarColor(inv.customerCode || inv.customerName) + ';width:36px;height:36px;font-size:13px;flex-shrink:0;">' + avatarInitial(inv.customerName) + '</div>' +
+          '<div style="min-width:0;"><div style="font-size:12.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (inv.customerName || '') + '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + addr + '</div></div>' +
+        '</div>' +
         statusHtml +
       '</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">' +
-        '<div style="font-size:12px;font-weight:900;color:var(--maroon);">' + money(inv.grandTotal || inv.total || 0) + ' ج.م</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">' +
+        '<div style="font-size:13px;font-weight:900;color:var(--maroon);">' + money(inv.grandTotal || inv.total || 0) + ' ج.م</div>' +
         mapBtn +
       '</div>' +
       '<div style="display:flex;gap:8px;margin-top:10px;">' +
-        '<button onclick="markInvoiceDelivered(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--success);color:#fff;border-radius:10px;padding:9px;font-size:11px;font-weight:800;"><i class="fas fa-check"></i> تم التسليم والتحصيل</button>' +
-        '<button onclick="openDeliveryRejectModal(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--danger);color:#fff;border-radius:10px;padding:9px;font-size:11px;font-weight:800;"><i class="fas fa-xmark"></i> لم يتم</button>' +
+        '<button onclick="markInvoiceDelivered(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--success);color:#fff;border-radius:12px;padding:10px;font-size:11px;font-weight:800;"><i class="fas fa-check"></i> تم التسليم والتحصيل</button>' +
+        '<button onclick="openDeliveryRejectModal(&#39;' + inv.id + '&#39;)" style="flex:1;background:var(--danger);color:#fff;border-radius:12px;padding:10px;font-size:11px;font-weight:800;"><i class="fas fa-xmark"></i> لم يتم</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1347,6 +1466,7 @@ function startApp(){
       switchScreenRaw('deliveryHome');
       renderDeliveryHome();
       startDeliveryInvoicesListener();
+      startDeliveryHistoryListener();
     } else {
       switchScreenRaw('repHome');
       renderRepHome();
