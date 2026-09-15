@@ -854,6 +854,9 @@ function initCloud(){
       db = firebase.firestore();
     }
     listenStoreData();
+    listenProducts();
+    listenCustomers();
+    listenStockLevels();
     listenMyOrders();
   } catch (e) {
     console.error('Firebase init error:', e);
@@ -863,35 +866,66 @@ function initCloud(){
   }
 }
 
+let productsListenerStarted = false, customersListenerStarted = false, stockLevelsListenerStarted = false;
+
+// المنتجات بقت في مجموعة مستقلة (productRecords) بدل ما تكون جوا ملف storeData الكبير،
+// عشان تقدر تكبر لعدد كبير من غير ما توصل لحد الحجم الأقصى للملف الواحد
+function listenProducts(){
+  if (productsListenerStarted) return;
+  productsListenerStarted = true;
+  db.collection('productRecords').onSnapshot(function(snap){
+    var all = snap.docs.map(function(d){ return d.data(); });
+    products = all.filter(function(p){ return p.showInApp !== false; });
+    setStorage('products', all);
+    refreshVisibleScreens();
+  }, function(err){ console.error('Products listener error:', err); });
+}
+
+// نفس الفكرة للعملاء (customerRecords) - مستخدمة في وضع المندوب لاختيار التاجر
+function listenCustomers(){
+  if (customersListenerStarted) return;
+  customersListenerStarted = true;
+  db.collection('customerRecords').onSnapshot(function(snap){
+    allCustomers = snap.docs.map(function(d){ return d.data(); });
+    setStorage('customers', allCustomers);
+    if (repMode) refreshRepScreensIfNeeded();
+  }, function(err){ console.error('Customers listener error:', err); });
+}
+
+// أرصدة المخزون الحية (نفس المجموعة اللي نظام المعلم بيرفعلها، ونفس المجموعة اللي بيتعمل عليها
+// حجز/إرجاع المخزون وقت الطلب)
+function listenStockLevels(){
+  if (stockLevelsListenerStarted) return;
+  stockLevelsListenerStarted = true;
+  db.collection('stockLevels').onSnapshot(function(snap){
+    var sl = {};
+    snap.docs.forEach(function(d){ var data = d.data(); sl[d.id] = data.qty || 0; });
+    stockLevels = sl;
+    setStorage('inventory_stockLevels', sl);
+    refreshVisibleScreens();
+  }, function(err){ console.error('Stock levels listener error:', err); });
+}
+
 function applyStoreData(data){
-  products      = (data.products || []).filter(function(p){ return p.showInApp !== false; });
   appCategories = (data.appCategories || []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
   appBrands     = (data.appBrands || []).filter(function(b){ return b.active !== false; });
   appBanners    = (data.appBanners || []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
   appOffers     = (data.appOffers || []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
-  var inv = data.inventory || {};
-  stockLevels = {};
-  for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
   loyaltySettings = data.loyaltySettings || loyaltySettings;
   requireActivationCode = !!data.requireActivationCode;
   activationCodes = data.activationCodes || [];
-  // بيانات "وضع مندوب": قايمة العملاء (للاختيار منها) وقايمة المناديب (لفحص بيانات الدخول)
-  allCustomers = data.customers || [];
+  // بيانات "وضع مندوب": قايمة المناديب (لفحص بيانات الدخول) - العملاء بقوا ليهم Listener مستقل (listenCustomers)
   allSalesmen  = data.salesmen || [];
   // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
-  setStorage('products', data.products || []);
   setStorage('appCategories', data.appCategories || []);
   setStorage('appBrands', data.appBrands || []);
   setStorage('appBanners', data.appBanners || []);
   setStorage('appOffers', data.appOffers || []);
-  setStorage('inventory', inv);
-  setStorage('customers', data.customers || []);
   setStorage('salesmen', data.salesmen || []);
   localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
   localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
   localStorage.setItem('activationCodes', JSON.stringify(activationCodes));
   loadLoyaltyPoints();
-  if (repMode) refreshRepScreensIfNeeded();
 }
 
 function listenStoreData(){
@@ -916,9 +950,7 @@ function loadStoreDataFromLocalCache(){
   appBrands     = getStorage('appBrands', []).filter(function(b){ return b.active !== false; });
   appBanners    = getStorage('appBanners', []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
   appOffers     = getStorage('appOffers', []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
-  var inv = getStorage('inventory', {});
-  stockLevels = {};
-  for (var code in inv) { if (inv.hasOwnProperty(code)) stockLevels[code] = inv[code].qty || 0; }
+  stockLevels   = getStorage('inventory_stockLevels', {});
   requireActivationCode = getStorage('requireActivationCode', false);
   activationCodes = getStorage('activationCodes', []);
   allCustomers = getStorage('customers', []);
@@ -1147,16 +1179,8 @@ function saveRepVisit(){
     // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
     if (!cust.location && repPendingLocation) {
       cust.location = repPendingLocation;
-      db.collection('storeData').doc('main').get().then(function(docSnap){
-        if (!docSnap.exists) return;
-        var data = docSnap.data();
-        var custList = data.customers || [];
-        var idx = custList.findIndex(function(c){ return String(c.code) === String(cust.code); });
-        if (idx !== -1) {
-          custList[idx].location = repPendingLocation;
-          db.collection('storeData').doc('main').update({ customers: custList }).catch(function(e){ console.error('customer location update failed:', e); });
-        }
-      });
+      db.collection('customerRecords').doc(String(cust.code)).update({ location: repPendingLocation })
+        .catch(function(e){ console.error('customer location update failed:', e); });
     }
   }
   closeModalOverlay('repVisitModal');
