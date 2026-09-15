@@ -1841,7 +1841,18 @@ function addToCart(code, unit, qty){
   var stock = getStock(code);
   if (stock <= 0) return;
   var maxUnit = unit === 'secondary' ? (p.maxOrderQty || 99) * (p.secondaryUnit ? p.secondaryUnit.factor || 1 : 1) : (p.maxOrderQty || 99);
+  // الحد الأقصى المسموح بيه من نفس الوحدة دي حسب المتاح فعليًا بالمخزن (بالكرتونة)
+  var stockCapInUnit = (unit === 'secondary' && p.secondaryUnit && p.secondaryUnit.factor) ? Math.floor(stock * p.secondaryUnit.factor) : stock;
+  var requestedQty = qty;
   qty = Math.max(0, Math.min(qty, maxUnit));
+  if (qty > stockCapInUnit) {
+    qty = stockCapInUnit;
+    if (requestedQty > stockCapInUnit && stockCapInUnit > 0) {
+      showToast('الكمية المتاحة من هذا الصنف ' + stockCapInUnit + ' ' + (unit === 'secondary' && p.secondaryUnit ? p.secondaryUnit.name : p.unit) + ' بس - تم إضافة أقصى كمية متاحة');
+    } else if (stockCapInUnit <= 0) {
+      showToast('الكمية المتاحة من هذا الصنف خلصت', 'error');
+    }
+  }
   if (qty <= 0) delete cart[code]; else cart[code] = { unit: unit, qty: qty };
   localStorage.setItem('app_cart', JSON.stringify(cart));
   updateCartBadge();
