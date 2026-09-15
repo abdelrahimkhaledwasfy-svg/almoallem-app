@@ -1975,11 +1975,20 @@ function sendOrderToServer(){
 function openOrderDetail(orderId){
   var o = myOrders.find(function(ord){ return ord.id === orderId; });
   if (!o) return;
+  var editable = o.status === 'pending';
   var statusInfo = STATUS_LABELS[o.status] || STATUS_LABELS.pending;
   var itemsHtml = (o.items || []).map(function(i){
     return '<div class="invoice-row"><div><div class="iname">' + i.productName + '</div>' +
       '<div class="imeta">' + i.qty + ' × ' + i.unit + ' — ' + money(i.price) + ' ج.م</div></div>' +
-      '<div style="font-weight:800;color:var(--maroon);">' + money(i.total) + ' ج.م</div></div>';
+      (editable ?
+        ('<div style="display:flex;align-items:center;gap:6px;">' +
+          '<button onclick="adjustOrderItemQty(&#39;' + o.id + '&#39;,&#39;' + i.productCode + '&#39;,&#39;' + i.unit + '&#39;,-1)" style="width:24px;height:24px;border-radius:8px;background:var(--sand);font-weight:900;">-</button>' +
+          '<span style="font-weight:800;font-size:11px;min-width:16px;text-align:center;">' + i.qty + '</span>' +
+          '<button onclick="adjustOrderItemQty(&#39;' + o.id + '&#39;,&#39;' + i.productCode + '&#39;,&#39;' + i.unit + '&#39;,1)" style="width:24px;height:24px;border-radius:8px;background:var(--sand);font-weight:900;">+</button>' +
+          '<button onclick="removeOrderItem(&#39;' + o.id + '&#39;,&#39;' + i.productCode + '&#39;,&#39;' + i.unit + '&#39;)" style="color:var(--danger);padding:4px;"><i class="fas fa-trash"></i></button>' +
+        '</div>') :
+        ('<div style="font-weight:800;color:var(--maroon);">' + money(i.total) + ' ج.م</div>')
+      ) + '</div>';
   }).join('');
   var deliveryLabel = o.deliveryTime === 'evening' ? 'مسائي (4م - 9م)' : (o.deliveryTime === 'morning' ? 'صباحي (9ص - 2ظ)' : '-');
   var addressLine = [o.addressDetail, o.neighborhood, o.city].filter(Boolean).join(' - ');
@@ -1996,10 +2005,56 @@ function openOrderDetail(orderId){
     '<div class="invoice-totals-row"><span>الإجمالي الفرعي</span><span>' + money(o.subtotal) + ' ج.م</span></div>' +
     (o.discountFromPoints > 0 ? '<div class="invoice-totals-row" style="color:var(--success);"><span><i class="fas fa-star" style="color:var(--gold);"></i> خصم نقاط الولاء (' + (o.pointsRedeemed || 0) + ' نقطة)</span><span>- ' + money(o.discountFromPoints) + ' ج.م</span></div>' : '') +
     '<div class="invoice-totals-row grand"><span>الإجمالي النهائي</span><span>' + money(o.total) + ' ج.م</span></div>' +
-    (o.status === 'rejected' ? ('<div class="order-rejected-box" style="margin-top:12px;"><i class="fas fa-circle-xmark"></i> تم رفض الطلب' + (o.rejectionReason ? ('<br><span style="font-weight:600;">السبب: ' + o.rejectionReason + '</span>') : '') + '</div>') : '');
+    (o.status === 'rejected' ? ('<div class="order-rejected-box" style="margin-top:12px;"><i class="fas fa-circle-xmark"></i> تم رفض الطلب' + (o.rejectionReason ? ('<br><span style="font-weight:600;">السبب: ' + o.rejectionReason + '</span>') : '') + '</div>') : '') +
+    (editable ? '<button onclick="cancelMyOrder(&#39;' + o.id + '&#39;)" style="width:100%;margin-top:12px;background:none;border:2px solid var(--danger);color:var(--danger);border-radius:12px;padding:10px;font-size:11.5px;font-weight:800;"><i class="fas fa-ban"></i> إلغاء الطلب بالكامل</button>' : '') +
+    (editable ? '<div style="text-align:center;font-size:9.5px;color:var(--muted);margin-top:8px;">التعديل متاح طول ما الطلب لسه قيد المراجعة</div>' : '');
   document.getElementById('orderDetailModal').classList.add('show');
 }
 function closeOrderDetail(){ document.getElementById('orderDetailModal').classList.remove('show'); }
+
+function adjustOrderItemQty(orderId, productCode, unit, delta){
+  var o = myOrders.find(function(ord){ return ord.id === orderId; });
+  if (!o || o.status !== 'pending') return;
+  var it = (o.items || []).find(function(i){ return i.productCode === productCode && i.unit === unit; });
+  if (!it) return;
+  var newQty = it.qty + delta;
+  if (newQty <= 0) { removeOrderItem(orderId, productCode, unit); return; }
+  it.qty = newQty;
+  it.total = it.price * newQty;
+  saveOrderItemsUpdate(o);
+}
+
+function removeOrderItem(orderId, productCode, unit){
+  var o = myOrders.find(function(ord){ return ord.id === orderId; });
+  if (!o || o.status !== 'pending') return;
+  var remaining = (o.items || []).filter(function(i){ return !(i.productCode === productCode && i.unit === unit); });
+  if (remaining.length === 0) { cancelMyOrder(orderId); return; }
+  o.items = remaining;
+  saveOrderItemsUpdate(o);
+}
+
+function saveOrderItemsUpdate(o){
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
+  var subtotal = o.items.reduce(function(s, it){ return s + it.total; }, 0);
+  var discount = o.discountFromPoints || 0;
+  db.collection('customerOrders').doc(o.id).update({
+    items: o.items, subtotal: subtotal, total: subtotal - discount
+  }).then(function(){
+    openOrderDetail(o.id);
+  }).catch(function(err){ console.error('Order item update failed:', err); showToast('تعذر حفظ التعديل', 'error'); });
+}
+
+function cancelMyOrder(orderId){
+  var o = myOrders.find(function(ord){ return ord.id === orderId; });
+  if (!o || o.status !== 'pending') return;
+  if (!confirm('متأكد إنك عايز تلغي الطلب ده بالكامل؟')) return;
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
+  db.collection('customerOrders').doc(orderId).update({ status: 'rejected', rejectionReason: 'ألغاه العميل' }).then(function(){
+    closeOrderDetail();
+    showToast('تم إلغاء الطلب');
+  }).catch(function(err){ console.error('Cancel order failed:', err); showToast('تعذر إلغاء الطلب', 'error'); });
+}
+
 
 var STATUS_LABELS = {
   pending: ['قيد المراجعة', 'status-pending'],
