@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.almoallem.app",
+        "sha256_cert_fingerprints": ["9F:2A:71:A6:67:51:54:76:8A:16:AE:65:E9:6F:12:9E:3A:90:5C:60:D1:7F:09:58:E3:3F:4C:A2:54:87:BD:DB"]
+      }
+    }]
