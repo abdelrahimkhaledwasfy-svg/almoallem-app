@@ -1856,6 +1856,49 @@ function submitProfile(){
   sendOrderToServer();
 }
 
+// ==================== حجز/إرجاع المخزون (يمنع تعارض طلبين على نفس الكمية) ====================
+function computeStockDeductQty(productCode, unit, qty){
+  var product = products.find(function(p){ return p.code === productCode; });
+  var isSecondary = product && product.secondaryUnit && unit === product.secondaryUnit.name;
+  return isSecondary ? (qty / product.secondaryUnit.factor) : qty;
+}
+
+// items: [{productCode, unit, qty, productName}] بوحدات الطلب العادية - بيتحول لوحدة الكرتونة جوه الدالة
+function reserveStockForItems(items){
+  if (!db) return Promise.reject(new Error('لا يوجد اتصال بالإنترنت'));
+  var wanted = items.map(function(it){ return { productCode: it.productCode, productName: it.productName, deductQty: computeStockDeductQty(it.productCode, it.unit, it.qty) }; });
+  var refs = wanted.map(function(w){ return db.collection('stockLevels').doc(w.productCode); });
+  if (refs.length === 0) return Promise.resolve();
+  return db.runTransaction(function(t){
+    return Promise.all(refs.map(function(r){ return t.get(r); })).then(function(snaps){
+      for (var i = 0; i < snaps.length; i++){
+        var currentQty = snaps[i].exists ? (snaps[i].data().qty || 0) : 0;
+        if (currentQty < wanted[i].deductQty){
+          throw new Error('الكمية غير متوفرة حاليًا للصنف: ' + wanted[i].productName + ' (المتاح: ' + currentQty + ')');
+        }
+      }
+      for (var i = 0; i < snaps.length; i++){
+        var currentQty = snaps[i].exists ? (snaps[i].data().qty || 0) : 0;
+        t.set(refs[i], { code: wanted[i].productCode, qty: currentQty - wanted[i].deductQty, updatedAt: Date.now() });
+      }
+    });
+  });
+}
+
+function returnStockForItems(items){
+  if (!db || items.length === 0) return Promise.resolve();
+  var wanted = items.map(function(it){ return { productCode: it.productCode, deductQty: computeStockDeductQty(it.productCode, it.unit, it.qty) }; });
+  var refs = wanted.map(function(w){ return db.collection('stockLevels').doc(w.productCode); });
+  return db.runTransaction(function(t){
+    return Promise.all(refs.map(function(r){ return t.get(r); })).then(function(snaps){
+      for (var i = 0; i < snaps.length; i++){
+        var currentQty = snaps[i].exists ? (snaps[i].data().qty || 0) : 0;
+        t.set(refs[i], { code: wanted[i].productCode, qty: currentQty + wanted[i].deductQty, updatedAt: Date.now() });
+      }
+    });
+  });
+}
+
 function sendOrderToServer(){
   var lines = getCartLineItems();
   if (lines.length === 0) return;
@@ -1875,17 +1918,19 @@ function sendOrderToServer(){
   var openOrder = (!isRepOrder && customerPhone) ? myOrders.find(function(o){ return o.status === 'pending'; }) : null;
 
   if (openOrder) {
-    // العميل عنده طلب لسه "جديد" (أمين المخزن ما بدأش يشتغل عليه) - نضيف الأصناف دي له بدل ما نعمل طلب منفصل جديد
-    var mergedItems = (openOrder.items || []).map(function(it){ return Object.assign({}, it); });
-    items.forEach(function(newIt){
-      var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
-      if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
-      else { mergedItems.push(newIt); }
-    });
-    var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
-    var mergedDiscount = openOrder.discountFromPoints || 0;
-    db.collection('customerOrders').doc(openOrder.id).update({
-      items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount
+    // العميل عنده طلب لسه "جديد" (أمين المخزن ما بدأش يشتغل عليه) - نحجز مخزون الأصناف الجديدة ونضيفها لنفس الطلب
+    reserveStockForItems(items).then(function(){
+      var mergedItems = (openOrder.items || []).map(function(it){ return Object.assign({}, it); });
+      items.forEach(function(newIt){
+        var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
+        if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
+        else { mergedItems.push(newIt); }
+      });
+      var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
+      var mergedDiscount = openOrder.discountFromPoints || 0;
+      return db.collection('customerOrders').doc(openOrder.id).update({
+        items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount, stockReserved: true
+      });
     }).then(function(){
       cart = {};
       localStorage.setItem('app_cart', '{}');
@@ -1896,11 +1941,12 @@ function sendOrderToServer(){
     }).catch(function(err){
       console.error('Order merge failed:', err);
       showLoading(false);
-      showToast('تعذر تحديث الطلب، حاول تاني', 'error');
+      showToast(err && err.message ? err.message : 'تعذر تحديث الطلب، حاول تاني', 'error');
     });
     return;
   }
 
+  reserveStockForItems(items).then(function(){
   var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var order = isRepOrder ? {
     id: orderId,
@@ -1921,6 +1967,7 @@ function sendOrderToServer(){
     total: cartTotal - discount,
     status: 'pending',
     createdAt: Date.now(),
+    stockReserved: true,
     repCode: currentRep ? currentRep.code : '',
     repName: currentRep ? currentRep.name : '',
     source: 'rep'
@@ -1942,10 +1989,11 @@ function sendOrderToServer(){
     discountFromPoints: discount,
     total: cartTotal - discount,
     status: 'pending',
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    stockReserved: true
   };
   // الطلب بيتبعت مباشرة لـ Firestore، وده هو المصدر اللي نظام المعلم بيتابعه لحظيًا
-  db.collection('customerOrders').doc(orderId).set(order).then(function(){
+  return db.collection('customerOrders').doc(orderId).set(order).then(function(){
     lastOrderItems = JSON.parse(JSON.stringify(cart));
     localStorage.setItem('app_last_order', JSON.stringify(lastOrderItems));
     cart = {};
@@ -1965,10 +2013,11 @@ function sendOrderToServer(){
     } else {
       switchTopTab('home'); switchScreen('home');
     }
+  });
   }).catch(function(err){
     console.error('Order send failed:', err);
     showLoading(false);
-    showToast('تعذر إرسال الطلب، تأكد من الاتصال بالإنترنت وحاول تاني', 'error');
+    showToast(err && err.message ? err.message : 'تعذر إرسال الطلب، تأكد من الاتصال بالإنترنت وحاول تاني', 'error');
   });
 }
 
@@ -2019,18 +2068,48 @@ function adjustOrderItemQty(orderId, productCode, unit, delta){
   if (!it) return;
   var newQty = it.qty + delta;
   if (newQty <= 0) { removeOrderItem(orderId, productCode, unit); return; }
-  it.qty = newQty;
-  it.total = it.price * newQty;
-  saveOrderItemsUpdate(o);
+
+  if (!o.stockReserved) {
+    // طلب قديم من قبل تفعيل حجز المخزون - مانلمسش المخزون هنا، الخصم هيحصل زي ما كان وقت التجهيز
+    it.qty = newQty; it.total = it.price * newQty;
+    saveOrderItemsUpdate(o);
+    return;
+  }
+  var unitPrice = it.price;
+  if (delta > 0) {
+    showLoading(true);
+    reserveStockForItems([{ productCode: productCode, productName: it.productName, unit: unit, qty: delta }]).then(function(){
+      it.qty = newQty; it.total = unitPrice * newQty;
+      showLoading(false);
+      saveOrderItemsUpdate(o);
+    }).catch(function(err){
+      showLoading(false);
+      showToast(err && err.message ? err.message : 'تعذر زيادة الكمية', 'error');
+    });
+  } else {
+    returnStockForItems([{ productCode: productCode, unit: unit, qty: -delta }]).then(function(){
+      it.qty = newQty; it.total = unitPrice * newQty;
+      saveOrderItemsUpdate(o);
+    }).catch(function(err){ console.error('Return stock failed:', err); showToast('تعذر تحديث الكمية', 'error'); });
+  }
 }
 
 function removeOrderItem(orderId, productCode, unit){
   var o = myOrders.find(function(ord){ return ord.id === orderId; });
   if (!o || o.status !== 'pending') return;
+  var target = (o.items || []).find(function(i){ return i.productCode === productCode && i.unit === unit; });
   var remaining = (o.items || []).filter(function(i){ return !(i.productCode === productCode && i.unit === unit); });
   if (remaining.length === 0) { cancelMyOrder(orderId); return; }
-  o.items = remaining;
-  saveOrderItemsUpdate(o);
+  var doRemove = function(){
+    o.items = remaining;
+    saveOrderItemsUpdate(o);
+  };
+  if (o.stockReserved && target) {
+    returnStockForItems([{ productCode: target.productCode, unit: target.unit, qty: target.qty }]).then(doRemove)
+      .catch(function(err){ console.error('Return stock failed:', err); showToast('تعذر حذف الصنف', 'error'); });
+  } else {
+    doRemove();
+  }
 }
 
 function saveOrderItemsUpdate(o){
@@ -2049,10 +2128,15 @@ function cancelMyOrder(orderId){
   if (!o || o.status !== 'pending') return;
   if (!confirm('متأكد إنك عايز تلغي الطلب ده بالكامل؟')) return;
   if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
-  db.collection('customerOrders').doc(orderId).update({ status: 'rejected', rejectionReason: 'ألغاه العميل' }).then(function(){
+  showLoading(true);
+  var restoreStock = o.stockReserved ? returnStockForItems(o.items || []) : Promise.resolve();
+  restoreStock.then(function(){
+    return db.collection('customerOrders').doc(orderId).update({ status: 'rejected', rejectionReason: 'ألغاه العميل' });
+  }).then(function(){
+    showLoading(false);
     closeOrderDetail();
     showToast('تم إلغاء الطلب');
-  }).catch(function(err){ console.error('Cancel order failed:', err); showToast('تعذر إلغاء الطلب', 'error'); });
+  }).catch(function(err){ console.error('Cancel order failed:', err); showLoading(false); showToast('تعذر إلغاء الطلب', 'error'); });
 }
 
 
