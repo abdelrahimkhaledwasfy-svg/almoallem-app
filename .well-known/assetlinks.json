@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "com.almoallem.app",
-        "sha256_cert_fingerprints": ["9F:2A:71:A6:67:51:54:76:8A:16:AE:65:E9:6F:12:9E:3A:90:5C:60:D1:7F:09:58:E3:3F:4C:A2:54:87:BD:DB"]
+        "sha256_cert_fingerprints": ["12:AA:B4:21:F2:09:D2:93:BC:52:FD:7D:B4:D9:AB:0C:10:1E:38:CD:49:83:72:32:86:EC:9D:9E:D6:EB:30:DD"]
       }
     }]
