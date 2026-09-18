@@ -785,6 +785,7 @@ const ASWAN_NEIGHBORHOODS = [
 ];
 
 let products = [], appCategories = [], appBrands = [], appBanners = [], appOffers = [];
+let appNeighborhoods = []; // قائمة الأحياء اللي بيديرها الأدمن من نظام المعلم (المناطق الجغرافية)
 let stockLevels = {};
 let cart = JSON.parse(localStorage.getItem('app_cart') || '{}');
 let cartSyncTimer = null;
@@ -956,16 +957,22 @@ function applyStoreData(data){
   activationCodes = data.activationCodes || [];
   // بيانات "وضع مندوب": قايمة المناديب (لفحص بيانات الدخول) - العملاء بقوا ليهم Listener مستقل (listenCustomers)
   allSalesmen  = data.salesmen || [];
+  // *** إصلاح 2026-09: الأحياء بقت بتتقرا من نفس القائمة اللي الأدمن بيديرها من نظام المعلم ***
+  // (المناطق الجغرافية ← الأحياء) بدل قائمة ثابتة جوه كود الأبليكشن كانت منفصلة تمامًا عنها -
+  // كان ده سبب إن الأحياء اللي الأدمن بيكتبها ما كانتش بتظهر للعميل وقت التسجيل خالص.
+  appNeighborhoods = data.appNeighborhoods || [];
   // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
   setStorage('appCategories', data.appCategories || []);
   setStorage('appBrands', data.appBrands || []);
   setStorage('appBanners', data.appBanners || []);
   setStorage('appOffers', data.appOffers || []);
   setStorage('salesmen', data.salesmen || []);
+  setStorage('appNeighborhoods', data.appNeighborhoods || []);
   localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
   localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
   localStorage.setItem('activationCodes', JSON.stringify(activationCodes));
   loadLoyaltyPoints();
+  populateRegDropdowns();
 }
 
 function listenStoreData(){
@@ -993,8 +1000,10 @@ function loadStoreDataFromLocalCache(){
   stockLevels   = getStorage('inventory_stockLevels', {});
   requireActivationCode = getStorage('requireActivationCode', false);
   activationCodes = getStorage('activationCodes', []);
+  appNeighborhoods = getStorage('appNeighborhoods', []);
   allCustomers = getStorage('customers', []);
   allSalesmen  = getStorage('salesmen', []);
+  populateRegDropdowns();
 }
 
 // ==================== تسجيل الدخول / إنشاء حساب / وضع الزائر ====================
@@ -1014,8 +1023,18 @@ function togglePwVisibility(inputId, iconEl){
 function populateRegDropdowns(){
   var nSel = document.getElementById('regNeighborhood');
   var cSel = document.getElementById('regCity');
-  if (nSel && nSel.options.length <= 1) {
-    ASWAN_NEIGHBORHOODS.forEach(function(n){ var o = document.createElement('option'); o.value = n; o.textContent = n; nSel.appendChild(o); });
+  if (nSel) {
+    // *** إصلاح 2026-09: بنفضّل قائمة الأحياء اللي الأدمن بيديرها من نظام المعلم (لو مضاف فيها حاجة) ***
+    // بدل القائمة الثابتة القديمة. بنعيد بناء القائمة كل مرة (مش مرة واحدة بس) عشان لو الأدمن ضاف/عدّل
+    // حي بعد ما العميل فاتح الصفحة، يبان له فورًا من غير ما يحتاج يقفل ويفتح تاني.
+    var currentValue = nSel.value;
+    var names = (appNeighborhoods && appNeighborhoods.length > 0)
+      ? appNeighborhoods.map(function(n){ return n.name; })
+      : ASWAN_NEIGHBORHOODS;
+    nSel.innerHTML = '<option value="">اختر الحي</option>' + names.map(function(n){
+      return '<option value="' + n.replace(/"/g, '&quot;') + '">' + n + '</option>';
+    }).join('');
+    if (currentValue && names.indexOf(currentValue) !== -1) nSel.value = currentValue;
   }
   if (cSel && cSel.options.length <= 1) {
     ASWAN_CITIES.forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
