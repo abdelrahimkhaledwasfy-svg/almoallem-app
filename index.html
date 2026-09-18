@@ -787,6 +787,38 @@ const ASWAN_NEIGHBORHOODS = [
 let products = [], appCategories = [], appBrands = [], appBanners = [], appOffers = [];
 let stockLevels = {};
 let cart = JSON.parse(localStorage.getItem('app_cart') || '{}');
+let cartSyncTimer = null;
+
+// *** إصلاح 2026-09: السلة كانت متخزنة في الجهاز بس (localStorage) وماكنش ليها أي نسخة على السحابة ***
+// ده كان معناه إن سلة العميل مرتبطة بالجهاز اللي هو بيستخدمه بس، ولو المندوب فتح حساب نفس العميل من
+// جهازه هو (وضع المندوب)، كان بيشوف سلة فاضية بدل سلة العميل الحقيقية. دلوقتي كل تغيير في السلة
+// بيترفع (بعد تأخير بسيط) لمستند خاص بكل عميل على Firestore (customerCarts/{phone})، وبيتحمّل من
+// هناك كل ما حد (العميل نفسه من جهاز تاني، أو مندوب بيطلب نيابة عنه) يدخل على نفس الحساب.
+function getCartOwnerPhone(){
+  if (repMode && typeof repTargetCustomer !== 'undefined' && repTargetCustomer) return repTargetCustomer.phone || repTargetCustomer.code;
+  return customerPhone;
+}
+function scheduleCartSync(){
+  clearTimeout(cartSyncTimer);
+  cartSyncTimer = setTimeout(pushCartToCloud, 700);
+}
+function pushCartToCloud(){
+  if (!db) return;
+  var phone = getCartOwnerPhone();
+  if (!phone) return; // زائر بدون حساب - السلة تفضل محلية بس
+  db.collection('customerCarts').doc(phone).set({ cart: cart, updatedAt: Date.now() }).catch(function(e){ console.error('cart cloud sync failed:', e); });
+}
+function loadCartFromCloud(phone, callback){
+  if (!db || !phone) { if (callback) callback(); return; }
+  db.collection('customerCarts').doc(phone).get().then(function(snap){
+    cart = (snap.exists && snap.data() && snap.data().cart) ? snap.data().cart : {};
+    localStorage.setItem('app_cart', JSON.stringify(cart));
+    if (callback) callback();
+  }).catch(function(e){
+    console.error('cart cloud load failed:', e);
+    if (callback) callback();
+  });
+}
 let favorites = JSON.parse(localStorage.getItem('app_favorites') || '[]');
 let customerPhone = localStorage.getItem('app_customer_phone') || null;
 let customerProfile = JSON.parse(localStorage.getItem('app_customer_profile') || 'null');
@@ -1210,13 +1242,19 @@ function renderRepVisitsList(){
 function startRepOrderFlow(){
   if (!repTargetCustomer) return;
   closeModalOverlay('repClientActionsModal');
-  cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
-  document.getElementById('repOrderBanner').style.display = 'flex';
-  document.getElementById('repOrderBanner').classList.remove('hidden');
-  document.getElementById('repOrderBannerName').textContent = repTargetCustomer.name || repTargetCustomer.code;
-  var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
-  switchScreenRaw('home');
-  renderHome();
+  var targetPhone = repTargetCustomer.phone || repTargetCustomer.code;
+  showLoading(true);
+  // بنحمّل سلة العميل الحقيقية بتاعته من السحابة (لو هو حاطط فيها حاجة من موبايله) بدل ما نبدأ بسلة فاضية
+  loadCartFromCloud(targetPhone, function(){
+    showLoading(false);
+    updateCartBadge();
+    document.getElementById('repOrderBanner').style.display = 'flex';
+    document.getElementById('repOrderBanner').classList.remove('hidden');
+    document.getElementById('repOrderBannerName').textContent = repTargetCustomer.name || repTargetCustomer.code;
+    var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
+    switchScreenRaw('home');
+    renderHome();
+  });
 }
 
 function cancelRepOrderFlow(){
@@ -1483,6 +1521,10 @@ function startApp(){
   loadMyOrders();
   loadLoyaltyPoints();
   updateCartBadge();
+  // نجيب سلة العميل الحقيقية من السحابة (لو مسجل دخول بحساب حقيقي) عشان تفضل هي نفسها مهما دخل من أي جهاز
+  if (!repMode && !isGuest && customerPhone) {
+    loadCartFromCloud(customerPhone, function(){ updateCartBadge(); if (document.getElementById('cartScreen').classList.contains('active')) renderCart(); });
+  }
   if (repMode) {
     document.getElementById('topTabsBar').style.display = 'none';
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
@@ -1855,6 +1897,7 @@ function addToCart(code, unit, qty){
   }
   if (qty <= 0) delete cart[code]; else cart[code] = { unit: unit, qty: qty };
   localStorage.setItem('app_cart', JSON.stringify(cart));
+  scheduleCartSync();
   updateCartBadge();
   renderHome();
   if (document.getElementById('categoryScreen').classList.contains('active')) renderCategoryProducts();
@@ -1921,6 +1964,7 @@ function applyLastOrder(){
   if (!lastOrderItems || Object.keys(lastOrderItems).length === 0){ showToast('لا يوجد طلب سابق'); return; }
   cart = JSON.parse(JSON.stringify(lastOrderItems));
   localStorage.setItem('app_cart', JSON.stringify(cart));
+  scheduleCartSync();
   updateCartBadge();
   showToast('تم استرجاع آخر طلب');
   switchScreen('cart');
@@ -2089,6 +2133,7 @@ function sendOrderToServer(){
     }).then(function(){
       cart = {};
       localStorage.setItem('app_cart', '{}');
+      scheduleCartSync();
       updateCartBadge();
       showLoading(false);
       showToast('تمت إضافة الأصناف لطلبك السابق #' + openOrder.id.slice(-6) + ' ✓');
@@ -2153,6 +2198,7 @@ function sendOrderToServer(){
     localStorage.setItem('app_last_order', JSON.stringify(lastOrderItems));
     cart = {};
     localStorage.setItem('app_cart', '{}');
+    pushCartToCloud(); // بنمسح سلة العميل (أو التاجر لو الطلب من مندوب) على السحابة فورًا، قبل ما نصفّر repTargetCustomer تحت
     redeemPointsChecked = false;
     updateCartBadge();
     showLoading(false);
