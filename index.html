@@ -1346,7 +1346,10 @@ function updateDeliveryInvoiceStatus(invoiceId, patch){
   var inv = deliveryInvoices.find(function(i){ return String(i.id) === String(invoiceId); });
   if (!inv) return;
   Object.assign(inv, patch);
-  db.collection('invoiceRecords').doc(String(inv.id)).set(inv).catch(function(e){ console.error('invoice delivery update failed:', e); showToast('تعذر تحديث الفاتورة', 'error'); });
+  // *** إصلاح 2026-09: كانت بتكتب نسخة الفاتورة المحلية بالكامل (.set) فوق أي حاجة موجودة على ***
+  // السحابة، فلو حصل تعديل تاني على نفس الفاتورة (من نظام المعلم أو مندوب تاني) في نفس الوقت،
+  // كان بيتمسح من غير قصد. دلوقتي بنحدّث الحقول المطلوبة بس (.update) من غير ما نلمس أي حاجة تانية.
+  db.collection('invoiceRecords').doc(String(inv.id)).set(patch, { merge: true }).catch(function(e){ console.error('invoice delivery update failed:', e); showToast('تعذر تحديث الفاتورة', 'error'); });
 }
 
 function markInvoiceDelivered(invoiceId){
@@ -1357,8 +1360,12 @@ function markInvoiceDelivered(invoiceId){
     deliveredBy: currentRep ? currentRep.code : ''
   });
   // الفلوس بتتسجل في عهدة خاصة بالمندوب ده لوحده، منفصلة عن الخزينة العامة، لحد ما تتراجع
+  // *** إصلاح 2026-09: كان الـ id بتاع سجل التحصيل ده عشوائي بالكامل، يعني لو المندوب دوس زرار ***
+  // "تم التسليم" مرتين بسرعة (أو النت اتقطع وحاول تاني)، كانت بتتعمل سجلين منفصلين لنفس التسليم
+  // ويتضاعف المبلغ المسجل في عهدته. دلوقتي الـ id مبني على رقم الفاتورة نفسها، فأي محاولة تانية
+  // لنفس الفاتورة بتكتب فوق نفس السجل بدل ما تعمل واحد جديد.
   var record = {
-    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    id: 'DLV-' + inv.id,
     date: new Date().toISOString(),
     repUsername: currentRep ? currentRep.code : '',
     repFullName: currentRep ? currentRep.name : '',
