@@ -819,6 +819,14 @@ function loadCartFromCloud(phone, callback){
     if (callback) callback();
   });
 }
+// لو العميل قفل الصفحة أو سابها بسرعة قبل ما مهلة الـ700ms بتاعة مزامنة السلة تخلص، كنا هنفقد آخر
+// تعديل حصل في السلة (زي نفس مشكلة المخزون اللي حصلت في نظام المعلم). هنا بنرفع أي سلة لسه مستنية
+// فورًا لحظة ما الصفحة تتخبّى/تتقفل، بدل ما ننتظر المهلة العادية.
+function flushCartSyncNow(){
+  if (cartSyncTimer) { clearTimeout(cartSyncTimer); cartSyncTimer = null; pushCartToCloud(); }
+}
+document.addEventListener('visibilitychange', function(){ if (document.hidden) flushCartSyncNow(); });
+window.addEventListener('pagehide', flushCartSyncNow);
 let favorites = JSON.parse(localStorage.getItem('app_favorites') || '[]');
 let customerPhone = localStorage.getItem('app_customer_phone') || null;
 let customerProfile = JSON.parse(localStorage.getItem('app_customer_profile') || 'null');
@@ -2119,16 +2127,26 @@ function sendOrderToServer(){
   if (openOrder) {
     // العميل عنده طلب لسه "جديد" (أمين المخزن ما بدأش يشتغل عليه) - نحجز مخزون الأصناف الجديدة ونضيفها لنفس الطلب
     reserveStockForItems(items).then(function(){
-      var mergedItems = (openOrder.items || []).map(function(it){ return Object.assign({}, it); });
-      items.forEach(function(newIt){
-        var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
-        if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
-        else { mergedItems.push(newIt); }
-      });
-      var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
-      var mergedDiscount = openOrder.discountFromPoints || 0;
-      return db.collection('customerOrders').doc(openOrder.id).update({
-        items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount, stockReserved: true
+      // *** إصلاح 2026-09: كنا بنضيف الأصناف على آخر نسخة معروفة عندنا محليًا من الطلب (myOrders) ***
+      // لو العميل (أو مندوب بيطلب نيابة عنه) ضاف حاجتين ورا بعض بسرعة قبل ما التحديث الأول يوصل
+      // ويرجع تاني عن طريق الـ listener، الإضافة التانية كانت بتكتب فوق الأولى وتضيعها من الطلب -
+      // مع إن المخزون كان بالفعل اتحجز للصنف الضايع ده (reserveStockForItems فوق نجحت له لوحدها)،
+      // فكان بيفضل مخصوم من غير ما يظهر في أي فاتورة. دلوقتي بنقرا أحدث نسخة من الطلب "جوه" نفس
+      // العملية الذرية اللي بتكتب بيها، عشان نضمن إننا بنضيف فوق آخر حالة حقيقية مش نسخة قديمة.
+      var orderRef = db.collection('customerOrders').doc(openOrder.id);
+      return db.runTransaction(function(t){
+        return t.get(orderRef).then(function(snap){
+          var freshOrder = snap.exists ? snap.data() : openOrder;
+          var mergedItems = (freshOrder.items || []).map(function(it){ return Object.assign({}, it); });
+          items.forEach(function(newIt){
+            var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
+            if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
+            else { mergedItems.push(newIt); }
+          });
+          var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
+          var mergedDiscount = freshOrder.discountFromPoints || 0;
+          t.update(orderRef, { items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount, stockReserved: true });
+        });
       });
     }).then(function(){
       cart = {};
