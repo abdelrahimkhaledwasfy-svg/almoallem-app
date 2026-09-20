@@ -1099,8 +1099,8 @@ function repLogout(){
   location.reload();
 }
 
-function openModalOverlay(id){ document.getElementById(id).classList.add('show'); }
-function closeModalOverlay(id){ document.getElementById(id).classList.remove('show'); }
+function openModalOverlay(id){ document.getElementById(id).classList.add('show'); pushModalNav(id); }
+function closeModalOverlay(id){ closeTrackedModal(id); }
 
 function refreshRepScreensIfNeeded(){
   if (document.getElementById('repHomeScreen') && document.getElementById('repHomeScreen').classList.contains('active')) {
@@ -1280,6 +1280,7 @@ function startRepOrderFlow(){
     document.getElementById('repOrderBannerName').textContent = repTargetCustomer.name || repTargetCustomer.code;
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
     switchScreenRaw('home');
+    setNavRoot('home', 'switchScreen');
     renderHome();
   });
 }
@@ -1290,6 +1291,7 @@ function cancelRepOrderFlow(){
   document.getElementById('repOrderBanner').style.display = 'none';
   var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
   switchScreenRaw('repHome');
+  setNavRoot('repHome', 'switchScreen');
   renderRepHome();
 }
 
@@ -1564,11 +1566,13 @@ function startApp(){
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
     if (currentRep && currentRep.type === 'delivery') {
       switchScreenRaw('deliveryHome');
+      setNavRoot('deliveryHome', 'switchScreen');
       renderDeliveryHome();
       startDeliveryInvoicesListener();
       startDeliveryHistoryListener();
     } else {
       switchScreenRaw('repHome');
+      setNavRoot('repHome', 'switchScreen');
       renderRepHome();
     }
   } else {
@@ -1621,13 +1625,85 @@ function loadLoyaltyPoints(){
 function getStock(code){ return stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999; }
 function inStockOnly(list){ return list.filter(function(p){ return getStock(p.code) > 0; }); }
 
+// ===== نظام تتبع الرجوع (زرار الرجوع الفيزيائي في الموبايل) =====
+// الفكرة: كل ما نفتح شاشة فرعية أو مودال، نضيف خطوة في تاريخ المتصفح (history)،
+// وزرار رجوع الموبايل بيرجع خطوة واحدة في history بدل ما يقفل التطبيق كامل.
+var navStack = [{ type: 'screen', name: 'home', via: 'switchScreen' }];
+var isNavPopping = false;
+var TOP_LEVEL_NAV_SCREENS = ['home', 'offers', 'cart', 'account'];
+
+function isTopLevelNavScreen(name){ return TOP_LEVEL_NAV_SCREENS.indexOf(name) !== -1; }
+
+function setNavRoot(name, via){
+  navStack = [{ type: 'screen', name: name, via: via || 'switchScreen' }];
+  try { history.replaceState({ navLen: 1 }, '', location.href); } catch(e){}
+}
+
+function pushOrReplaceScreenNav(name, via){
+  if (isNavPopping) return;
+  var top = navStack[navStack.length - 1];
+  if (top && top.type === 'screen' && top.name === name) return;
+  var entry = { type: 'screen', name: name, via: via };
+  if (isTopLevelNavScreen(name) && top && top.type === 'screen' && isTopLevelNavScreen(top.name)) {
+    navStack[navStack.length - 1] = entry;
+    try { history.replaceState({ navLen: navStack.length }, '', location.href); } catch(e){}
+  } else {
+    navStack.push(entry);
+    try { history.pushState({ navLen: navStack.length }, '', location.href); } catch(e){}
+  }
+}
+
+function pushModalNav(modalId){
+  if (isNavPopping) return;
+  var top = navStack[navStack.length - 1];
+  if (top && top.type === 'modal' && top.modalId === modalId) return;
+  navStack.push({ type: 'modal', modalId: modalId });
+  try { history.pushState({ navLen: navStack.length }, '', location.href); } catch(e){}
+}
+
+function closeTrackedModal(modalId){
+  var top = navStack[navStack.length - 1];
+  if (!isNavPopping && top && top.type === 'modal' && top.modalId === modalId) {
+    history.back(); // popstate هيتكفل بإخفاء المودال فعليًا
+  } else {
+    var el = document.getElementById(modalId);
+    if (el) el.classList.remove('show');
+  }
+}
+
+function refreshScreenAfterNav(name){
+  if (name === 'cart') renderCart();
+  else if (name === 'favorites') renderFavorites();
+  else if (name === 'offers') renderOffers();
+  else if (name === 'confirm') renderConfirm();
+  else if (name === 'orders') renderOrders();
+  else if (name === 'account') loadLoyaltyPoints();
+}
+
+window.addEventListener('popstate', function(){
+  if (navStack.length <= 1) return; // إحنا في جذر التطبيق، سيب زرار الموبايل يعمل اللي هو عايز يعمله (يقفل/يصغّر)
+  isNavPopping = true;
+  var top = navStack.pop();
+  if (top.type === 'modal') {
+    var el = document.getElementById(top.modalId);
+    if (el) el.classList.remove('show');
+  } else if (top.type === 'screen') {
+    var prev = navStack[navStack.length - 1];
+    if (prev && prev.type === 'screen') {
+      if (prev.via === 'switchTopTab') switchTopTab(prev.name); else switchScreen(prev.name);
+      refreshScreenAfterNav(prev.name);
+    }
+  }
+  isNavPopping = false;
+});
+
 function switchScreenRaw(name){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById(name + 'Screen').classList.add('active');
   window.scrollTo(0,0);
 }
 function switchScreen(name){
-  if (repMode && name === 'home' && !repTargetCustomer) { switchScreenRaw('repHome'); renderRepHome(); return; }
+  if (repMode && name === 'home' && !repTargetCustomer) { switchScreenRaw('repHome'); renderRepHome(); pushOrReplaceScreenNav('repHome', 'switchScreen'); return; }
   switchScreenRaw(name);
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   if (name === 'home') document.getElementById('navHome').classList.add('active');
@@ -1636,6 +1712,7 @@ function switchScreen(name){
   if (name === 'favorites') renderFavorites();
   if (name === 'offers') renderOffers();
   if (name === 'confirm') renderConfirm();
+  pushOrReplaceScreenNav(name, 'switchScreen');
 }
 function switchTopTab(tab){
   document.querySelectorAll('.top-tab').forEach(function(b){b.classList.toggle('active', b.dataset.toptab === tab);});
@@ -1646,10 +1723,11 @@ function switchTopTab(tab){
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   if (tab === 'home') document.getElementById('navHome').classList.add('active');
   if (tab === 'account') document.getElementById('navAccount').classList.add('active');
+  pushOrReplaceScreenNav(tab, 'switchTopTab');
 }
 
 function categoryIconHtml(cat){
-  if (cat.imageUrl) return '<img src="' + cat.imageUrl + '" class="cat-img">';
+  if (cat.imageUrl) return '<img src="' + cat.imageUrl + '" class="cat-img" loading="lazy" decoding="async">';
   return '<div class="cat-icon"><i class="fas fa-box"></i></div>';
 }
 function renderHome(){
@@ -1771,7 +1849,7 @@ function openCategory(catId){
       return pCat === (cat ? cat.name : '') && p.brand === b.name;
     }).length;
     html += '<button class="brand-tile" onclick="openCategoryProducts(&#39;' + b.name.replace(/&#39;/g, "\&#39;") + '&#39;)">' +
-        (b.logoUrl ? '<img src="' + b.logoUrl + '" class="brand-logo">' : '<div class="brand-logo-fallback">' + b.name.slice(0,2) + '</div>') +
+        (b.logoUrl ? '<img src="' + b.logoUrl + '" class="brand-logo" loading="lazy" decoding="async">' : '<div class="brand-logo-fallback">' + b.name.slice(0,2) + '</div>') +
         '<div class="brand-name">' + b.name + '</div><div class="brand-count">' + count + ' صنف</div></button>';
   });
   grid.innerHTML = html;
@@ -1874,7 +1952,7 @@ function productCardHtml(p){
   var unitPrice = getUnitPrice(p, isSecondary ? 'secondary' : 'primary');
   var activeOffer = !isSecondary ? getActiveOffer(p.code) : null;
   var isFav = favorites.includes(p.code);
-  var imgHtml = p.imageUrl ? '<img src="' + p.imageUrl + '" class="pcard-img">' : '<div class="pcard-img-fallback"><i class="fas fa-box-open"></i></div>';
+  var imgHtml = p.imageUrl ? '<img src="' + p.imageUrl + '" class="pcard-img" loading="lazy" decoding="async">' : '<div class="pcard-img-fallback"><i class="fas fa-box-open"></i></div>';
 
   if (isGuest && !repMode) {
         '<div class="pcard-body">' +
@@ -1970,7 +2048,7 @@ function renderCart(){
   }
   var html = lines.map(function(l){
     return '<div class="cart-item">' +
-        (l.product.imageUrl ? '<img src="' + l.product.imageUrl + '">' : '<div class="fallback"><i class="fas fa-box-open"></i></div>') +
+        (l.product.imageUrl ? '<img src="' + l.product.imageUrl + '" loading="lazy" decoding="async">' : '<div class="fallback"><i class="fas fa-box-open"></i></div>') +
         '<div class="cart-item-info">' +
         '<div class="cart-item-name">' + l.product.name + '</div>' +
         '<div class="cart-item-unit">' + l.unitLabel + '</div>' +
@@ -2253,6 +2331,7 @@ function sendOrderToServer(){
       document.getElementById('repOrderBanner').style.display = 'none';
       var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
       switchScreenRaw('repHome');
+      setNavRoot('repHome', 'switchScreen');
       renderRepHome();
       showToast('تم إرسال الطلب لصالح ' + doneForName + ' بنجاح ✓');
     } else {
@@ -2303,8 +2382,9 @@ function openOrderDetail(orderId){
     (editable ? '<button onclick="cancelMyOrder(&#39;' + o.id + '&#39;)" style="width:100%;margin-top:12px;background:none;border:2px solid var(--danger);color:var(--danger);border-radius:12px;padding:10px;font-size:11.5px;font-weight:800;"><i class="fas fa-ban"></i> إلغاء الطلب بالكامل</button>' : '') +
     (editable ? '<div style="text-align:center;font-size:9.5px;color:var(--muted);margin-top:8px;">التعديل متاح طول ما الطلب لسه قيد المراجعة</div>' : '');
   document.getElementById('orderDetailModal').classList.add('show');
+  pushModalNav('orderDetailModal');
 }
-function closeOrderDetail(){ document.getElementById('orderDetailModal').classList.remove('show'); }
+function closeOrderDetail(){ closeTrackedModal('orderDetailModal'); }
 
 function adjustOrderItemQty(orderId, productCode, unit, delta){
   var o = myOrders.find(function(ord){ return ord.id === orderId; });
@@ -2459,8 +2539,9 @@ function openRatingModal(orderId){
   document.getElementById('ratingComment').value = (ord && ord.rating && ord.rating.comment) ? ord.rating.comment : '';
   paintStars();
   document.getElementById('ratingModal').classList.add('show');
+  pushModalNav('ratingModal');
 }
-function closeRatingModal(){ document.getElementById('ratingModal').classList.remove('show'); }
+function closeRatingModal(){ closeTrackedModal('ratingModal'); }
 function paintStars(){
   document.querySelectorAll('#ratingStars i').forEach(function(el){
     el.classList.toggle('filled', Number(el.dataset.star) <= currentRatingStars);
