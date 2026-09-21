@@ -291,6 +291,7 @@
         </div>
       </div>
       <button class="btn-login-gold" id="loginBtn" onclick="doLoginScreenSubmit()">تسجيل الدخول</button>
+      <div class="login-signup-row" style="margin-top:10px;"><a onclick="requestPasswordReset()" style="color:var(--danger,#c0392b);"><i class="fas fa-key" style="margin-left:4px;"></i>نسيت الرقم السري؟</a></div>
       <div class="login-divider">— أو —</div>
       <div class="login-signup-row">مستخدم جديد؟ <a onclick="showRegisterScreen()">إنشاء حساب</a></div>
       <div class="login-signup-row" style="margin-top:6px;">أنا مندوب <a onclick="showRepLoginScreen()">دخول كمندوب</a></div>
@@ -1452,6 +1453,17 @@ async function doLoginScreenSubmit(){
     showLoading(false);
     showToast('تعذر تسجيل الدخول، حاول تاني', 'error');
   }
+}
+
+function requestPasswordReset(){
+  var phone = document.getElementById('loginPhone').value.trim();
+  var msg = 'السلام عليكم، نسيت الرقم السري بتاع حسابي في تطبيق المعلم.';
+  if (phone) { msg += '\nرقم الهاتف المسجل: ' + phone; }
+  else { msg += '\n(من فضلكم اطلبوا مني رقم الهاتف المسجل بالحساب)'; }
+  msg += '\nياريت تساعدوني أعمل رقم سري جديد.';
+  var waNumber = '201155835917';
+  var url = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
 }
 
 async function doRegisterAndLogin(){
