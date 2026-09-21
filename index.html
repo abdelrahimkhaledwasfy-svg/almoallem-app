@@ -201,15 +201,22 @@
   .rep-input-wrap input,.rep-input-wrap select{width:100%;padding:12px 40px 12px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--card);font-size:12.5px;font-weight:700;font-family:inherit;color:var(--ink);}
   .rep-input-wrap input:focus{outline:none;border-color:var(--gold);}
   .rep-input-wrap i{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--maroon);font-size:14px;}
-  .client-card{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:11px 13px;margin-bottom:9px;cursor:pointer;box-shadow:0 2px 8px rgba(122,31,31,0.05);transition:transform .12s;}
+  .client-card{display:flex;align-items:flex-start;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:11px 13px;margin-bottom:9px;cursor:pointer;box-shadow:0 2px 8px rgba(122,31,31,0.05);transition:transform .12s;}
   .client-card:active{transform:scale(0.98);}
-  .client-avatar{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));}
+  .client-avatar{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));margin-top:2px;}
   .client-info{flex:1;min-width:0;}
   .client-name{font-size:12.5px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .client-meta{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);margin-top:3px;}
   .client-meta i{font-size:9px;width:11px;}
-  .client-visit-badge{font-size:9px;font-weight:800;color:var(--success);background:#E9F5EC;padding:3px 8px;border-radius:99px;white-space:nowrap;}
-  .client-arrow{color:var(--muted);font-size:12px;flex-shrink:0;}
+  .client-visit-badge{font-size:9px;font-weight:800;color:var(--success);background:#E9F5EC;padding:3px 8px;border-radius:99px;white-space:nowrap;margin-top:2px;}
+  .client-arrow{color:var(--muted);font-size:12px;flex-shrink:0;margin-top:15px;}
+  .client-shop{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .client-address{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .client-address i{font-size:9px;width:11px;}
+  .client-phone-row{display:flex;align-items:center;gap:6px;margin-top:5px;}
+  .client-phone-big{font-size:15px;font-weight:900;color:var(--maroon);direction:ltr;}
+  .client-call-btn{width:30px;height:30px;border-radius:50%;background:#1e7a3d;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;text-decoration:none;}
+  .client-call-btn:active{transform:scale(0.92);}
   .rep-action-btn{display:flex;align-items:center;gap:12px;width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;text-align:right;}
   .rep-action-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;color:#fff;}
   .rep-action-title{font-size:12.5px;font-weight:800;color:var(--ink);}
@@ -626,10 +633,14 @@
         <div class="client-avatar" id="repClientActionsAvatar" style="width:38px;height:38px;font-size:13px;">-</div>
         <div>
           <div style="font-size:13px;font-weight:900;color:var(--ink);" id="repClientActionsName">-</div>
+          <div style="font-size:10.5px;color:var(--muted);" id="repClientActionsShop"></div>
           <div style="font-size:10px;color:var(--muted);" id="repClientActionsMeta">-</div>
         </div>
       </div>
-      <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a class="client-call-btn" id="repClientActionsCallBtn" href="#" style="display:none;"><i class="fas fa-phone"></i></a>
+        <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+      </div>
     </div>
     <button class="rep-action-btn" onclick="openRepVisitModal()">
       <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));"><i class="fas fa-route"></i></div>
@@ -1160,11 +1171,16 @@ function renderRepClientResults(){
   if (list.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-magnifying-glass"></i><p>لا يوجد عملاء مطابقين</p></div>'; return; }
   wrap.innerHTML = list.map(function(c){
     var lv = lastVisitFor(c.code);
+    var shopLine = c.shopName ? '<div class="client-shop"><i class="fas fa-store" style="font-size:9px;margin-left:3px;"></i>' + c.shopName + '</div>' : '';
+    var addrLine = c.address ? '<div class="client-address"><i class="fas fa-location-dot"></i> ' + c.address + '</div>' : '';
+    var phoneLine = c.phone ? '<div class="client-phone-row"><a class="client-call-btn" href="tel:' + c.phone + '" onclick="event.stopPropagation()"><i class="fas fa-phone"></i></a><span class="client-phone-big">' + c.phone + '</span></div>' : '';
     return '<div class="client-card" onclick="openRepClientActions(&#39;' + String(c.code).replace(/'/g,"\\'") + '&#39;)">' +
       '<div class="client-avatar" style="background:' + avatarColor(c.code) + ';">' + avatarInitial(c.name || c.code) + '</div>' +
       '<div class="client-info">' +
         '<div class="client-name">' + (c.name || c.code) + '</div>' +
-        '<div class="client-meta">' + (c.phone ? '<i class="fas fa-phone"></i> ' + c.phone : (c.address ? '<i class="fas fa-location-dot"></i> ' + c.address : '')) + '</div>' +
+        shopLine +
+        addrLine +
+        phoneLine +
       '</div>' +
       (lv ? '<span class="client-visit-badge">زيارة ' + timeAgoAr(lv.date) + '</span>' : '') +
       '<i class="fas fa-chevron-left client-arrow"></i>' +
@@ -1177,7 +1193,11 @@ function openRepClientActions(code){
   if (!cust) return;
   repTargetCustomer = cust;
   document.getElementById('repClientActionsName').textContent = cust.name || cust.code;
-  document.getElementById('repClientActionsMeta').textContent = cust.phone || cust.address || '';
+  document.getElementById('repClientActionsShop').textContent = cust.shopName || '';
+  document.getElementById('repClientActionsMeta').textContent = cust.address || '';
+  var callBtn = document.getElementById('repClientActionsCallBtn');
+  if (cust.phone) { callBtn.href = 'tel:' + cust.phone; callBtn.style.display = 'flex'; }
+  else { callBtn.style.display = 'none'; }
   var av = document.getElementById('repClientActionsAvatar');
   av.textContent = avatarInitial(cust.name || cust.code);
   av.style.background = avatarColor(cust.code);
