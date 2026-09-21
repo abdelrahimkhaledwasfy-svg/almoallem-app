@@ -955,8 +955,30 @@ function listenStockLevels(){
     snap.docs.forEach(function(d){ var data = d.data(); sl[d.id] = data.qty || 0; });
     stockLevels = sl;
     setStorage('inventory_stockLevels', sl);
+    pruneOutOfStockCartItems();
     refreshVisibleScreens();
   }, function(err){ console.error('Stock levels listener error:', err); });
+}
+
+// لو صنف موجود في سلة العميل خلص من المخزون (بقى صفر) وهو لسه متسجّلش طلب بيه،
+// نشيله تلقائيًا من السلة بدل ما يفضل عالق فيها من غير ما يقدر يكمل أو يمسحه
+function pruneOutOfStockCartItems(){
+  var removedNames = [];
+  Object.keys(cart).forEach(function(code){
+    var stock = stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999;
+    if (stock <= 0) {
+      var p = products.find(function(x){ return x.code === code; });
+      removedNames.push(p ? p.name : code);
+      delete cart[code];
+    }
+  });
+  if (removedNames.length > 0) {
+    localStorage.setItem('app_cart', JSON.stringify(cart));
+    scheduleCartSync();
+    updateCartBadge();
+    showToast('تم حذف "' + removedNames.join('، ') + '" من السلة تلقائيًا لأن الكمية خلصت من المخزون', 'error');
+    if (document.getElementById('cartScreen') && document.getElementById('cartScreen').classList.contains('active')) renderCart();
+  }
 }
 
 function applyStoreData(data){
@@ -2025,7 +2047,7 @@ function addToCart(code, unit, qty){
   var p = products.find(function(x){return x.code === code;});
   if (!p) return;
   var stock = getStock(code);
-  if (stock <= 0) return;
+  if (qty > 0 && stock <= 0) { showToast('الكمية المتاحة من هذا الصنف خلصت', 'error'); return; }
   var maxUnit = unit === 'secondary' ? (p.maxOrderQty || 99) * (p.secondaryUnit ? p.secondaryUnit.factor || 1 : 1) : (p.maxOrderQty || 99);
   // الحد الأقصى المسموح بيه من نفس الوحدة دي حسب المتاح فعليًا بالمخزن (بالكرتونة)
   var stockCapInUnit = (unit === 'secondary' && p.secondaryUnit && p.secondaryUnit.factor) ? Math.floor(stock * p.secondaryUnit.factor) : stock;
