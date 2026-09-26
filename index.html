@@ -991,6 +991,8 @@ function applyStoreData(data){
   activationCodes = data.activationCodes || [];
   // بيانات "وضع مندوب": قايمة المناديب (لفحص بيانات الدخول) - العملاء بقوا ليهم Listener مستقل (listenCustomers)
   allSalesmen  = data.salesmen || [];
+  deliveryZoneMap = data.neighborhoodZoneMap || {};
+  if (currentRep && currentRep.type === 'delivery' && document.getElementById('deliveryInvoicesList')) renderDeliveryHome();
   // *** إصلاح 2026-09: الأحياء بقت بتتقرا من نفس القائمة اللي الأدمن بيديرها من نظام المعلم ***
   // (المناطق الجغرافية ← الأحياء) بدل قائمة ثابتة جوه كود الأبليكشن كانت منفصلة تمامًا عنها -
   // كان ده سبب إن الأحياء اللي الأدمن بيكتبها ما كانتش بتظهر للعميل وقت التسجيل خالص.
@@ -1347,6 +1349,18 @@ function cancelRepOrderFlow(){
 // لما يدوس "تم التسليم" بيتكتب على الطلب اسمه، ونظام المعلم بيقفل الطلب ويعمل الفاتورة والنقاط لوحده (مرة واحدة بس).
 // الفلوس بتتسجل في عهدة المندوب زي الأول. ولو "لم يتم التسليم" الطلب بيتحول مرتجع والمخزون المحجوز بيرجع.
 let deliveryInvoices = [];   // دلوقتي: الطلبات الخارجة للتسليم
+var deliveryZoneMap = getStorage('neighborhoodZoneMap', {});
+// الطلب ده لمين؟ 'mine' = ليا، 'open' = من غير مندوب (ظاهر للكل)، 'other' = لمندوب تاني
+function deliveryOwnership(o){
+  var me = currentRep ? String(currentRep.code) : '';
+  if (o.repDelivery) return (String(o.repDelivery.code) === me) ? 'mine' : 'other';
+  if (o.assignedDeliveryRep && o.assignedDeliveryRep.code) return String(o.assignedDeliveryRep.code) === me ? 'mine' : 'other';
+  var zoneId = deliveryZoneMap[o.neighborhood];
+  if (!zoneId) return 'open';
+  var covering = allSalesmen.filter(function(s){ return s.repType === 'delivery' && s.status !== 'غير نشط' && (s.deliveryZoneIds || []).indexOf(zoneId) !== -1; });
+  if (!covering.length) return 'open';
+  return covering.some(function(s){ return String(s.code) === me; }) ? 'mine' : 'other';
+}
 let deliveryListenerStarted = false;
 
 function startDeliveryInvoicesListener(){
@@ -1377,7 +1391,7 @@ function renderDeliveryHome(){
   var todayStr = new Date().toDateString();
   var doneToday = deliveryHistoryInvoices.filter(function(r){ return r.date && new Date(r.date).toDateString() === todayStr; });
   var totalCollected = doneToday.reduce(function(s, r){ return s + (Number(r.amount) || 0); }, 0);
-  document.getElementById('deliveryStatPending').textContent = deliveryInvoices.filter(function(o){ return !o.repDelivery; }).length;
+  document.getElementById('deliveryStatPending').textContent = deliveryInvoices.filter(function(o){ return !o.repDelivery && deliveryOwnership(o) !== 'other'; }).length;
   document.getElementById('deliveryStatDone').textContent = doneToday.length;
   document.getElementById('deliveryStatTotal').textContent = money(totalCollected);
   renderDeliveryInvoicesList();
@@ -1386,8 +1400,16 @@ function renderDeliveryHome(){
 function renderDeliveryInvoicesList(){
   var wrap = document.getElementById('deliveryInvoicesList');
   if (!wrap) return;
-  if (deliveryInvoices.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-truck"></i><p>لا توجد طلبات خارجة للتسليم حاليًا</p></div>'; return; }
-  wrap.innerHTML = deliveryInvoices.map(function(o){
+  var mineList = deliveryInvoices.filter(function(o){ return deliveryOwnership(o) === 'mine'; });
+  var openList = deliveryInvoices.filter(function(o){ return deliveryOwnership(o) === 'open'; });
+  if (!mineList.length && !openList.length) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-truck"></i><p>لا توجد طلبات خارجة للتسليم ليك حاليًا</p></div>'; return; }
+  var head = function(t, n){ return '<div style="font-size:12px;font-weight:900;color:var(--maroon);margin:14px 2px 8px;">' + t + ' (' + n + ')</div>'; };
+  wrap.innerHTML = (mineList.length ? head('طلباتك النهارده', mineList.length) + deliveryCardsHtml(mineList) : '') +
+    (openList.length ? head('طلبات من غير مندوب — أي حد يقدر يسلّمها', openList.length) + deliveryCardsHtml(openList) : '');
+}
+
+function deliveryCardsHtml(list){
+  return list.map(function(o){
     var confirmed = !!o.repDelivery;
     var statusHtml = confirmed
       ? '<span class="delivery-status-chip wait" style="background:#E1F5EE;color:#0F6E56;"><i class="fas fa-check"></i> اتسلم' + (o.repDelivery.name ? (' — ' + o.repDelivery.name) : '') + '</span>'
