@@ -1108,8 +1108,18 @@ async function doRepLoginSubmit(){
     var docSnap = await db.collection('storeData').doc('main').get();
     var data = docSnap.exists ? docSnap.data() : {};
     var salesmenList = data.salesmen || [];
-    var hash = await hashPassword(password);
-    var rep = salesmenList.find(function(s){ return s.repUsername && s.repUsername === username && s.repPasswordHash === hash; });
+    // الأرقام العربي (١٢٣) زي الإنجليزي، ومن غير فرق حروف كبيرة/صغيرة أو مسافات زيادة
+    var normDigits = function(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }); };
+    var normUser = function(v){ return normDigits(v).trim().toLowerCase(); };
+    var hashes = [await hashPassword(password), await hashPassword(normDigits(password)), await hashPassword(normDigits(password).trim())];
+    var rep = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username) && hashes.indexOf(s.repPasswordHash) !== -1; });
+    if (!rep) {
+      var sameUser = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username); });
+      showLoading(false);
+      if (!sameUser) { showToast('اليوزر ده مش موجود. اتأكد منه من شاشة "قاعدة المناديب" في السيستم', 'error'); return; }
+      if (!sameUser.repPasswordHash) { showToast('المندوب ده مالوش كلمة سر لسه. اكتبله كلمة سر من السيستم', 'error'); return; }
+      showToast('كلمة السر غلط', 'error'); return;
+    }
     showLoading(false);
     if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
     if (rep.status && rep.status !== 'نشط') { showToast('حساب المندوب موقوف حاليًا', 'error'); return; }
@@ -2464,6 +2474,8 @@ function sendOrderToServer(){
       return db.runTransaction(function(t){
         return t.get(orderRef).then(function(snap){
           var freshOrder = snap.exists ? snap.data() : openOrder;
+          // لو الطلب دخل التجهيز من ثواني، منضيفش عليه (المخزن مش هيجهز الزيادة) - هنعمل طلب جديد بدل كده
+          if (freshOrder.status !== 'pending') { var moved = new Error('ORDER_MOVED'); moved.code = 'ORDER_MOVED'; throw moved; }
           var mergedItems = (freshOrder.items || []).map(function(it){ return Object.assign({}, it); });
           items.forEach(function(newIt){
             var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
@@ -2484,14 +2496,20 @@ function sendOrderToServer(){
       showToast('تمت إضافة الأصناف لطلبك السابق #' + openOrder.id.slice(-6) + ' ✓');
       switchTopTab('home'); switchScreen('home');
     }).catch(function(err){
+      if (err && err.code === 'ORDER_MOVED') { createNewOrder(true); return; }   // الكمية محجوزة بالفعل
       console.error('Order merge failed:', err);
       showLoading(false);
+      if (!(err && /غير متوفرة/.test(err.message || ''))) returnStockForItems(items).catch(function(){});
       showToast(err && err.message ? err.message : 'تعذر تحديث الطلب، حاول تاني', 'error');
     });
     return;
   }
+  createNewOrder(false);
 
-  reserveStockForItems(items).then(function(){
+  function createNewOrder(alreadyReserved){
+  var reservedNow = false;
+  return (alreadyReserved ? Promise.resolve() : reserveStockForItems(items)).then(function(){
+  reservedNow = true;
   var orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
   var order = isRepOrder ? {
     id: orderId,
@@ -2564,8 +2582,11 @@ function sendOrderToServer(){
   }).catch(function(err){
     console.error('Order send failed:', err);
     showLoading(false);
+    // الكمية اتحجزت بس الطلب متسجلش (مثلاً النت فصل): نرجّعها عشان متفضلش محجوزة على الفاضي
+    if (reservedNow || alreadyReserved) returnStockForItems(items).catch(function(){});
     showToast(err && err.message ? err.message : 'تعذر إرسال الطلب، تأكد من الاتصال بالإنترنت وحاول تاني', 'error');
   });
+  }
 }
 
 function openOrderDetail(orderId){
@@ -2627,10 +2648,13 @@ function adjustOrderItemQty(orderId, productCode, unit, delta){
   var unitPrice = it.price;
   if (delta > 0) {
     showLoading(true);
-    reserveStockForItems([{ productCode: productCode, productName: it.productName, unit: unit, qty: delta }]).then(function(){
+    var addItem = [{ productCode: productCode, productName: it.productName, unit: unit, qty: delta }];
+    reserveStockForItems(addItem).then(function(){
+      var oldQty = it.qty;
       it.qty = newQty; it.total = unitPrice * newQty;
       showLoading(false);
-      saveOrderItemsUpdate(o);
+      var p = saveOrderItemsUpdate(o);
+      if (p && p.catch) p.catch(function(){ it.qty = oldQty; it.total = unitPrice * oldQty; returnStockForItems(addItem).catch(function(){}); });
     }).catch(function(err){
       showLoading(false);
       showToast(err && err.message ? err.message : 'تعذر زيادة الكمية', 'error');
@@ -2649,27 +2673,32 @@ function removeOrderItem(orderId, productCode, unit){
   var target = (o.items || []).find(function(i){ return i.productCode === productCode && i.unit === unit; });
   var remaining = (o.items || []).filter(function(i){ return !(i.productCode === productCode && i.unit === unit); });
   if (remaining.length === 0) { cancelMyOrder(orderId); return; }
-  var doRemove = function(){
-    o.items = remaining;
-    saveOrderItemsUpdate(o);
-  };
-  if (o.stockReserved && target) {
-    returnStockForItems([{ productCode: target.productCode, unit: target.unit, qty: target.qty }]).then(doRemove)
-      .catch(function(err){ console.error('Return stock failed:', err); showToast('تعذر حذف الصنف', 'error'); });
-  } else {
-    doRemove();
-  }
+  // بنشيل الصنف من الطلب الأول (بشرط إنه لسه جديد)، وبعدين بس نرجّع كميته
+  var before = o.items;
+  o.items = remaining;
+  var p = saveOrderItemsUpdate(o);
+  if (p && p.then) p.then(function(){
+    if (o.stockReserved && target) returnStockForItems([{ productCode: target.productCode, unit: target.unit, qty: target.qty }]).catch(function(err){ console.error('Return stock failed:', err); });
+  }).catch(function(){ o.items = before; });
 }
 
 function saveOrderItemsUpdate(o){
   if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
   var subtotal = o.items.reduce(function(s, it){ return s + it.total; }, 0);
   var discount = o.discountFromPoints || 0;
-  db.collection('customerOrders').doc(o.id).update({
-    items: o.items, subtotal: subtotal, total: subtotal - discount
+  var ref = db.collection('customerOrders').doc(o.id);
+  return db.runTransaction(function(t){
+    return t.get(ref).then(function(snap){
+      if (!snap.exists || snap.data().status !== 'pending') throw new Error('ORDER_MOVED');
+      t.update(ref, { items: o.items, subtotal: subtotal, total: subtotal - discount });
+    });
   }).then(function(){
     openOrderDetail(o.id);
-  }).catch(function(err){ console.error('Order item update failed:', err); showToast('تعذر حفظ التعديل', 'error'); });
+  }).catch(function(err){
+    console.error('Order item update failed:', err);
+    showToast(err && err.message === 'ORDER_MOVED' ? 'الطلب دخل التجهيز خلاص، ومينفعش يتعدل' : 'تعذر حفظ التعديل', 'error');
+    throw err;
+  });
 }
 
 function cancelMyOrder(orderId){
@@ -2678,14 +2707,22 @@ function cancelMyOrder(orderId){
   if (!confirm('متأكد إنك عايز تلغي الطلب ده بالكامل؟')) return;
   if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
   showLoading(true);
-  var restoreStock = o.stockReserved ? returnStockForItems(o.items || []) : Promise.resolve();
-  restoreStock.then(function(){
-    return db.collection('customerOrders').doc(orderId).update({ status: 'rejected', rejectionReason: 'ألغاه العميل' });
+  var ref = db.collection('customerOrders').doc(orderId);
+  var reserved = false, itemsNow = o.items || [];
+  db.runTransaction(function(t){
+    return t.get(ref).then(function(snap){
+      var d = snap.exists ? snap.data() : null;
+      if (!d || d.status !== 'pending') { var e = new Error('الطلب دخل التجهيز خلاص، ومينفعش يتلغي من هنا. كلمنا لو محتاج تلغيه'); throw e; }
+      reserved = !!d.stockReserved; itemsNow = d.items || [];
+      t.update(ref, { status: 'rejected', rejectionReason: 'ألغاه العميل' });
+    });
+  }).then(function(){
+    return reserved ? returnStockForItems(itemsNow) : null;
   }).then(function(){
     showLoading(false);
     closeOrderDetail();
     showToast('تم إلغاء الطلب');
-  }).catch(function(err){ console.error('Cancel order failed:', err); showLoading(false); showToast('تعذر إلغاء الطلب', 'error'); });
+  }).catch(function(err){ console.error('Cancel order failed:', err); showLoading(false); showToast(err && err.message ? err.message : 'تعذر إلغاء الطلب', 'error'); });
 }
 
 
