@@ -730,6 +730,28 @@
 
 <div id="toast"></div>
 <script>
+  // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
+  // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
+  var APP_BUILD = '2026-09-28-2';
+  (function(){
+    function check(){
+      if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
+      fetch('./index.html?v=' + Date.now(), { cache: 'no-store' }).then(function(r){ return r.ok ? r.text() : ''; }).then(function(txt){
+        var m = /var APP_BUILD = '([^']+)'/.exec(txt || '');
+        if (!m || m[1] === APP_BUILD) return;
+        sessionStorage.setItem('app_update_reloaded', APP_BUILD);
+        var jobs = [];
+        if (window.caches) jobs.push(caches.keys().then(function(keys){ return Promise.all(keys.filter(function(k){ return /almoallem/.test(k); }).map(function(k){ return caches.delete(k); })); }));
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function(regs){ return Promise.all(regs.map(function(r){ return r.update().catch(function(){}); })); }));
+        Promise.all(jobs).catch(function(){}).then(function(){ location.reload(); });
+      }).catch(function(){});
+    }
+    window.addEventListener('load', function(){ setTimeout(check, 2500); });
+    document.addEventListener('visibilitychange', function(){ if (!document.hidden) check(); });
+  })();
+</script>
+
+<script>
   // أي خطأ مخفي بيظهر كرسالة، عشان عمرنا ما نبقى في موقف "دست ومحصلش حاجة"
   (function(){
     var shown = 0;
