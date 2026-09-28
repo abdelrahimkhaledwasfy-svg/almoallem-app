@@ -2,7 +2,7 @@
 // قبل كده الملف ده كان بيفتح النسخة المحفوظة من index.html على طول ومايسألش عن الجديدة،
 // فأي تحديث للأبليكشن ماكانش بيوصل للموبايلات. دلوقتي: لو فيه نت بنجيب أحدث نسخة دايمًا،
 // والمحفوظة بتتستخدم بس لو النت مقطوع.
-const CACHE_NAME = 'almoallem-app-v3';
+const CACHE_NAME = 'almoallem-app-v4';
 const CORE_ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function(event) {
@@ -17,12 +17,7 @@ self.addEventListener('activate', function(event) {
         caches.keys().then(function(keys) {
             // نمسح أي نسخة قديمة محفوظة (v2 وقبلها)
             return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME; }).map(function(k) { return caches.delete(k); }));
-        }).then(function() { return self.clients.claim(); }).then(function() {
-            // أي شاشة مفتوحة على النسخة القديمة بتتحدث لوحدها مرة واحدة
-            return self.clients.matchAll({ type: 'window' }).then(function(list) {
-                list.forEach(function(c) { try { c.navigate(c.url); } catch (e) {} });
-            });
-        })
+        }).then(function() { return self.clients.claim(); })
     );
 });
 
