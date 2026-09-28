@@ -732,10 +732,11 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-09-28-2';
+  var APP_BUILD = '2026-09-28-3';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
+      if (window._loginInProgress || (Date.now() - (window._appOpenedAt || 0)) > 15000) return;   // بس أول 15 ثانية من فتح الأبليكشن، وعمره ما يقطع دخول
       fetch('./index.html?v=' + Date.now(), { cache: 'no-store' }).then(function(r){ return r.ok ? r.text() : ''; }).then(function(txt){
         var m = /var APP_BUILD = '([^']+)'/.exec(txt || '');
         if (!m || m[1] === APP_BUILD) return;
@@ -746,8 +747,12 @@
         Promise.all(jobs).catch(function(){}).then(function(){ location.reload(); });
       }).catch(function(){});
     }
-    window.addEventListener('load', function(){ setTimeout(check, 2500); });
-    document.addEventListener('visibilitychange', function(){ if (!document.hidden) check(); });
+    window._appOpenedAt = Date.now();
+    try {
+      var tr = JSON.parse(localStorage.getItem('rep_login_trace') || 'null');
+      if (tr && Date.now() - tr.at < 5 * 60000) { localStorage.removeItem('rep_login_trace'); setTimeout(function(){ alert('آخر محاولة دخول كمندوب اتقطعت عند: ' + tr.step + '\nوالصفحة اتقفلت أو اتعاد تحميلها في النص.\nصوّر الرسالة دي وابعتها.'); }, 800); }
+    } catch (e) {}
+    window.addEventListener('load', function(){ setTimeout(check, 1500); });
   })();
 </script>
 
@@ -1138,6 +1143,10 @@ async function doRepLoginSubmit(){
   if (!(window.crypto && crypto.subtle)) { showToast('المتصفح ده مش بيدعم تسجيل الدخول الآمن. افتح الأبليكشن من Chrome', 'error'); return; }
   setBtn('جاري الدخول...');   // رد فعل فوري عشان يبان إن الزرار اشتغل
   showLoading(true);
+  window._loginInProgress = true;
+  var step = 'بدأ';
+  try { localStorage.setItem('rep_login_trace', JSON.stringify({ at: Date.now(), step: 'بدأ' })); } catch (e) {}
+  var mark = function(s){ step = s; try { localStorage.setItem('rep_login_trace', JSON.stringify({ at: Date.now(), step: s })); } catch (e) {} };
   try {
     // بنجيب أحدث نسخة من بيانات المناديب مباشرة (بدل ما نستنى الـ listener) عشان نضمن دخول صحيح من أول مرة
     // لو النت بطيء جدًا منستناش للأبد: بعد 12 ثانية بنقول
@@ -1146,6 +1155,7 @@ async function doRepLoginSubmit(){
       new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('TIMEOUT')); }, 12000); })
     ]);
     var data = docSnap.exists ? docSnap.data() : {};
+    mark('وصلت بيانات المناديب (' + ((data.salesmen || []).length) + ' مندوب)');
     var salesmenList = data.salesmen || [];
     // الأرقام العربي (١٢٣) زي الإنجليزي، ومن غير فرق حروف كبيرة/صغيرة أو مسافات زيادة
     var normDigits = function(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }); };
@@ -1161,9 +1171,10 @@ async function doRepLoginSubmit(){
     if (!rep) {
       var sameUser = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username); });
       showLoading(false);
-      if (!sameUser) { showToast('اليوزر ده مش موجود. اتأكد منه من شاشة "قاعدة المناديب" في السيستم', 'error'); return; }
-      if (!sameUser.repPasswordHash) { showToast('المندوب ده مالوش كلمة سر لسه. اكتبله كلمة سر من السيستم', 'error'); return; }
-      showToast('كلمة السر غلط', 'error'); return;
+      window._loginInProgress = false; try { localStorage.removeItem('rep_login_trace'); } catch (e) {}
+      if (!sameUser) { alert('اليوزر "' + username + '" مش موجود.\nاتأكد منه من شاشة "قاعدة المناديب" في السيستم.\n(موجود ' + salesmenList.filter(function(s){ return s.repUsername; }).length + ' مندوب ليهم يوزر)'); return; }
+      if (!sameUser.repPasswordHash) { alert('المندوب ده مالوش كلمة سر لسه. اكتبله كلمة سر من السيستم.'); return; }
+      alert('كلمة السر غلط'); return;
     }
     showLoading(false);
     if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
@@ -1173,10 +1184,17 @@ async function doRepLoginSubmit(){
     localStorage.setItem('app_rep_mode', '1');
     localStorage.setItem('app_current_rep', JSON.stringify(currentRep));
     isGuest = true; // وضع المندوب مش مرتبط بحساب عميل، فبنعامله كوضع تصفح مفتوح بدون حساب عميل
+    mark('اليوزر والباسورد صح، بيفتح شاشة المندوب');
     startApp();
+    mark('تم');
+    window._loginInProgress = false;
+    try { localStorage.removeItem('rep_login_trace'); } catch (e) {}
   } catch (err) {
     console.error('Rep login failed:', err);
+    window._loginInProgress = false;
     showLoading(false); setBtn('دخول');
+    try { localStorage.removeItem('rep_login_trace'); } catch (e) {}
+    alert('الدخول وقف عند: ' + step + '\nالسبب: ' + ((err && (err.code || err.message)) || err) + '\n\nصوّر الرسالة دي وابعتها.');
     showToast(err && err.message === 'TIMEOUT' ? 'النت بطيء ومقدرناش نوصل للسيرفر، جرب تاني' : ('تعذر الدخول: ' + ((err && (err.code || err.message)) || 'خطأ غير معروف')), 'error');
   }
 }
