@@ -233,7 +233,7 @@
   .rep-empty{text-align:center;padding:28px 16px;color:var(--muted);}
   .rep-empty i{font-size:30px;opacity:.35;margin-bottom:8px;display:block;}
   .rep-empty p{font-size:11px;font-weight:700;}
-  #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
+  #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100000;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .modal-overlay{position:fixed;inset:0;background:rgba(36,21,18,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
   .modal-overlay.show{display:flex;}
@@ -729,6 +729,15 @@
 </div>
 
 <div id="toast"></div>
+<script>
+  // أي خطأ مخفي بيظهر كرسالة، عشان عمرنا ما نبقى في موقف "دست ومحصلش حاجة"
+  (function(){
+    var shown = 0;
+    function report(msg){ try { if (shown++ > 3) return; var t = document.getElementById('toast'); if (!t) return; t.textContent = 'حصل خطأ: ' + String(msg || '').slice(0, 120); t.className = 'show error'; setTimeout(function(){ t.className = ''; }, 7000); } catch (e) {} }
+    window.addEventListener('error', function(e){ report(e.message); });
+    window.addEventListener('unhandledrejection', function(e){ report(e.reason && (e.reason.message || e.reason.code) || e.reason); });
+  })();
+</script>
 
 <script>
 
@@ -1098,21 +1107,35 @@ function showLoginScreenFromRep(){
 }
 
 async function doRepLoginSubmit(){
+  var btn = document.getElementById('repLoginBtn');
+  var setBtn = function(t){ if (btn) { btn.textContent = t; btn.disabled = t !== 'دخول'; } };
   var username = document.getElementById('repLoginUsername').value.trim();
   var password = document.getElementById('repLoginPassword').value;
   if (!username || !password) { showToast('ادخل اليوزر وكلمة السر', 'error'); return; }
-  if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
+  if (!db) { showToast('لا يوجد اتصال بالسيرفر حاليًا، اقفل الأبليكشن وافتحه تاني', 'error'); return; }
+  if (!(window.crypto && crypto.subtle)) { showToast('المتصفح ده مش بيدعم تسجيل الدخول الآمن. افتح الأبليكشن من Chrome', 'error'); return; }
+  setBtn('جاري الدخول...');   // رد فعل فوري عشان يبان إن الزرار اشتغل
   showLoading(true);
   try {
     // بنجيب أحدث نسخة من بيانات المناديب مباشرة (بدل ما نستنى الـ listener) عشان نضمن دخول صحيح من أول مرة
-    var docSnap = await db.collection('storeData').doc('main').get();
+    // لو النت بطيء جدًا منستناش للأبد: بعد 12 ثانية بنقول
+    var docSnap = await Promise.race([
+      db.collection('storeData').doc('main').get(),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('TIMEOUT')); }, 12000); })
+    ]);
     var data = docSnap.exists ? docSnap.data() : {};
     var salesmenList = data.salesmen || [];
     // الأرقام العربي (١٢٣) زي الإنجليزي، ومن غير فرق حروف كبيرة/صغيرة أو مسافات زيادة
     var normDigits = function(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }); };
     var normUser = function(v){ return normDigits(v).trim().toLowerCase(); };
-    var hashes = [await hashPassword(password), await hashPassword(normDigits(password)), await hashPassword(normDigits(password).trim())];
+    // كلمة السر ممكن تكون اتسجلت زمان بأرقام عربي أو فارسي أو إنجليزي: بنجرب كل الأشكال
+    var toAr = function(v){ return normDigits(v).replace(/[0-9]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'[d]; }); };
+    var toFa = function(v){ return normDigits(v).replace(/[0-9]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'[d]; }); };
+    var variants = [password, password.trim(), normDigits(password), normDigits(password).trim(), toAr(password.trim()), toFa(password.trim())];
+    var hashes = [];
+    for (var vi = 0; vi < variants.length; vi++) hashes.push(await hashPassword(variants[vi]));
     var rep = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username) && hashes.indexOf(s.repPasswordHash) !== -1; });
+    setBtn('دخول');
     if (!rep) {
       var sameUser = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username); });
       showLoading(false);
@@ -1131,8 +1154,8 @@ async function doRepLoginSubmit(){
     startApp();
   } catch (err) {
     console.error('Rep login failed:', err);
-    showLoading(false);
-    showToast('تعذر تسجيل الدخول، حاول تاني', 'error');
+    showLoading(false); setBtn('دخول');
+    showToast(err && err.message === 'TIMEOUT' ? 'النت بطيء ومقدرناش نوصل للسيرفر، جرب تاني' : ('تعذر الدخول: ' + ((err && (err.code || err.message)) || 'خطأ غير معروف')), 'error');
   }
 }
 
