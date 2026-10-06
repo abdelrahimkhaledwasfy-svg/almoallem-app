@@ -732,7 +732,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-10-06-1';
+  var APP_BUILD = '2026-10-06-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1788,6 +1788,9 @@ function getMyLoyaltyPoints(){
   if (repMode && repTargetCustomer) return repTargetCustomer.loyaltyPoints || 0;
   var customers = getStorage('customers', []);
   for (var i = 0; i < customers.length; i++){ if (customers[i].code === customerPhone) return customers[i].loyaltyPoints || 0; }
+  // العميل ممكن يكون متسجل في السيستم بكود تاني (C270) بنفس رقم تليفونه - النقاط بتتكتب على كل أكواده
+  var me = String(customerPhone || '').replace(/\D/g, '').slice(-10);
+  for (var j = 0; j < customers.length; j++){ var ph = String(customers[j].phone || '').replace(/\D/g, '').slice(-10); if (me && ph === me && customers[j].loyaltyPoints) return customers[j].loyaltyPoints || 0; }
   return 0;
 }
 
