@@ -318,7 +318,7 @@
       <div class="field">
         <label>يوزر المندوب</label>
         <div class="input-wrap">
-          <input type="text" id="repLoginUsername" placeholder="اكتب يوزر الدخول..." dir="ltr" style="text-align:left;">
+          <input type="text" id="repLoginUsername" placeholder="اليوزر أو رقم تليفونك..." dir="ltr" style="text-align:left;">
           <i class="fas fa-user"></i>
         </div>
       </div>
@@ -732,7 +732,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-09-28-3';
+  var APP_BUILD = '2026-10-06-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -796,6 +796,8 @@ const ONESIGNAL_APP_ID = "bd9f1359-0a6b-4dba-8a72-7401da5b809a";
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 function initOneSignalForCustomer(){
   if (!customerPhone || isGuest) return; // مفيش تسجيل خارجي للزوار، مالهمش رقم ثابت نبعتلهم عليه
+  // جوه أبليكشن أندرويد: الإشعارات بتتسجل من الموبايل نفسه برقم تليفون العميل (نفس اللي السيستم بيبعت عليه)
+  if (window.AlmoallemAndroid) { try { AlmoallemAndroid.login(String(customerPhone)); } catch (e) { console.error(e); } return; }
   window.OneSignalDeferred.push(async function(OneSignal){
     try {
       // الأبليكشن مش على جذر الدومين (هو جوه مجلد /almoallem-app/)، فلازم نحدد لـ OneSignal
@@ -1166,13 +1168,16 @@ async function doRepLoginSubmit(){
     var variants = [password, password.trim(), normDigits(password), normDigits(password).trim(), toAr(password.trim()), toFa(password.trim())];
     var hashes = [];
     for (var vi = 0; vi < variants.length; vi++) hashes.push(await hashPassword(variants[vi]));
-    var rep = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username) && hashes.indexOf(s.repPasswordHash) !== -1; });
+    // المندوب يدخل بيوزر الدخول أو برقم تليفونه (الاتنين شغالين)
+    var normPhone = function(v){ return normDigits(v).replace(/[^0-9]/g, '').replace(/^20(?=1)/, '0'); };
+    var isMe = function(s){ return (s.repUsername && normUser(s.repUsername) === normUser(username)) || (s.phone && normPhone(s.phone) && normPhone(s.phone) === normPhone(username)); };
+    var rep = salesmenList.find(function(s){ return s.repPasswordHash && isMe(s) && hashes.indexOf(s.repPasswordHash) !== -1; });
     setBtn('دخول');
     if (!rep) {
-      var sameUser = salesmenList.find(function(s){ return s.repUsername && normUser(s.repUsername) === normUser(username); });
+      var sameUser = salesmenList.find(function(s){ return isMe(s); });
       showLoading(false);
       window._loginInProgress = false; try { localStorage.removeItem('rep_login_trace'); } catch (e) {}
-      if (!sameUser) { alert('اليوزر "' + username + '" مش موجود.\nاتأكد منه من شاشة "قاعدة المناديب" في السيستم.\n(موجود ' + salesmenList.filter(function(s){ return s.repUsername; }).length + ' مندوب ليهم يوزر)'); return; }
+      if (!sameUser) { alert('مفيش مندوب باليوزر أو رقم التليفون "' + username + '".\nاتأكد منه من شاشة "قاعدة المناديب" في السيستم.\n(موجود ' + salesmenList.filter(function(s){ return s.repUsername; }).length + ' مندوب ليهم يوزر)'); return; }
       if (!sameUser.repPasswordHash) { alert('المندوب ده مالوش كلمة سر لسه. اكتبله كلمة سر من السيستم.'); return; }
       alert('كلمة السر غلط'); return;
     }
@@ -1701,7 +1706,8 @@ function captureLocation(){
 
 function doLogout(){
   if (!confirm('تسجيل الخروج؟')) return;
-  window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); });
+  if (window.AlmoallemAndroid) { try { AlmoallemAndroid.logout(); } catch (e) {} }
+  else window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); });
   localStorage.removeItem('app_customer_phone');
   localStorage.removeItem('app_customer_profile');
   localStorage.removeItem('app_guest_mode');
@@ -1760,7 +1766,8 @@ function startApp(){
 function listenMyOrders(){
   if (!customerPhone || !db) return;
   db.collection('customerOrders').where('customerCode', '==', customerPhone).onSnapshot(function(snap){
-    myOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    // الطلبات اللي السيستم ضمّها على طلب تاني لنفس اليوم (merged) مبتظهرش - أصنافها بقت جوه الطلب الأساسي
+    myOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'merged'; });
     myOrders.sort(function(a,b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
     setStorage('customerOrders', myOrders);
     detectOrderStatusChanges(myOrders);
@@ -2301,6 +2308,8 @@ function downloadOrderInvoicePdf(orderId){
     '<div class="foot">شكرًا لتعاملك مع المعلم</div></body></html>';
   var old = document.getElementById('invoicePrintFrame');
   if (old) old.remove();
+  // جوه أبليكشن أندرويد: الموبايل نفسه بيفتح شاشة الطباعة / الحفظ PDF
+  if (window.AlmoallemAndroid && AlmoallemAndroid.printHtml) { try { AlmoallemAndroid.printHtml(html, 'فاتورة المعلم'); return; } catch (e) { console.error(e); } }
   var frame = document.createElement('iframe');
   frame.id = 'invoicePrintFrame';
   frame.style.cssText = 'position:fixed;width:0;height:0;border:0;left:-9999px;';
@@ -2506,6 +2515,25 @@ function returnStockForItems(items){
   });
 }
 
+// يوم البيع عندنا من 9 الصبح لـ 9 الصبح اليوم اللي بعده (نفس حساب السيستم)
+function salesDayStartMs(ts){
+  var d = new Date(getTimeValue(ts) || Date.now());
+  var s = new Date(d); s.setHours(9, 0, 0, 0);
+  if (d < s) s.setDate(s.getDate() - 1);
+  return s.getTime();
+}
+// أقدم طلب "جديد" للعميل في يوم البيع الحالي (أو null) - من السحابة مباشرة
+function findOpenSameDayOrder(code){
+  if (!db || !code) return Promise.resolve(null);
+  var today = salesDayStartMs(Date.now());
+  return db.collection('customerOrders').where('customerCode', '==', code).get().then(function(snap){
+    var open = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+      .filter(function(o){ return o.status === 'pending' && salesDayStartMs(o.createdAt) === today; })
+      .sort(function(a, b){ return getTimeValue(a.createdAt) - getTimeValue(b.createdAt); });
+    return open[0] || null;
+  });
+}
+
 function sendOrderToServer(){
   var lines = getCartLineItems();
   if (lines.length === 0) return;
@@ -2522,42 +2550,64 @@ function sendOrderToServer(){
   var pv = loyaltySettings.pointValue || 1;
   var pointsRedeemed = discount > 0 ? Math.min(getAvailableLoyaltyPoints(), Math.ceil(discount / pv)) : 0;
   var isRepOrder = repMode && repTargetCustomer;
-  var openOrder = (!isRepOrder && customerPhone) ? myOrders.find(function(o){ return o.status === 'pending'; }) : null;
+  var targetCode = isRepOrder ? repTargetCustomer.code : customerPhone;
 
-  if (openOrder) {
-    // العميل عنده طلب لسه "جديد" (أمين المخزن ما بدأش يشتغل عليه) - نحجز مخزون الأصناف الجديدة ونضيفها لنفس الطلب
+  // *** 2026-10: فاتورة واحدة للعميل في يوم البيع ***
+  // طول ما العميل عنده طلب لسه "جديد" ومعمول في نفس يوم البيع (9 الصبح → 9 الصبح)، أي طلب تاني ليه -
+  // سواء العميل طلبه بنفسه أو مندوب طلبه له - بيتضاف على نفس الطلب، فيطلع فاتورة واحدة.
+  // أول ما الطلب يدخل "قيد التجهيز" أو يوم البيع يخلص، الطلب الجديد بيبقى طلب لوحده.
+  // بنجيب طلبات العميل من السحابة مباشرة (مش من النسخة المحلية) عشان المندوب كمان يشوف طلب العميل.
+  findOpenSameDayOrder(targetCode).then(function(openOrder){
+    if (!openOrder) { createNewOrder(false); return; }
+    // نحجز مخزون الأصناف الجديدة ونضيفها لنفس الطلب
     reserveStockForItems(items).then(function(){
-      // *** إصلاح 2026-09: كنا بنضيف الأصناف على آخر نسخة معروفة عندنا محليًا من الطلب (myOrders) ***
-      // لو العميل (أو مندوب بيطلب نيابة عنه) ضاف حاجتين ورا بعض بسرعة قبل ما التحديث الأول يوصل
-      // ويرجع تاني عن طريق الـ listener، الإضافة التانية كانت بتكتب فوق الأولى وتضيعها من الطلب -
-      // مع إن المخزون كان بالفعل اتحجز للصنف الضايع ده (reserveStockForItems فوق نجحت له لوحدها)،
-      // فكان بيفضل مخصوم من غير ما يظهر في أي فاتورة. دلوقتي بنقرا أحدث نسخة من الطلب "جوه" نفس
-      // العملية الذرية اللي بتكتب بيها، عشان نضمن إننا بنضيف فوق آخر حالة حقيقية مش نسخة قديمة.
+      // بنقرا أحدث نسخة من الطلب "جوه" نفس العملية الذرية اللي بتكتب بيها، عشان لو حصلت إضافتين ورا بعض
+      // بسرعة (العميل والمندوب مثلاً) محدش يكتب فوق التاني ويضيّع أصنافه
       var orderRef = db.collection('customerOrders').doc(openOrder.id);
       return db.runTransaction(function(t){
         return t.get(orderRef).then(function(snap){
-          var freshOrder = snap.exists ? snap.data() : openOrder;
-          // لو الطلب دخل التجهيز من ثواني، منضيفش عليه (المخزن مش هيجهز الزيادة) - هنعمل طلب جديد بدل كده
-          if (freshOrder.status !== 'pending') { var moved = new Error('ORDER_MOVED'); moved.code = 'ORDER_MOVED'; throw moved; }
+          var freshOrder = snap.exists ? snap.data() : null;
+          // لو الطلب دخل التجهيز من ثواني (أو يوم البيع خلص)، منضيفش عليه - هنعمل طلب جديد بدل كده
+          if (!freshOrder || freshOrder.status !== 'pending' || salesDayStartMs(freshOrder.createdAt) !== salesDayStartMs(Date.now())) {
+            var moved = new Error('ORDER_MOVED'); moved.code = 'ORDER_MOVED'; throw moved;
+          }
           var mergedItems = (freshOrder.items || []).map(function(it){ return Object.assign({}, it); });
           items.forEach(function(newIt){
-            var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit; });
+            var existing = mergedItems.find(function(it){ return it.productCode === newIt.productCode && it.unit === newIt.unit && Number(it.price) === Number(newIt.price); });
             if (existing) { existing.qty += newIt.qty; existing.total += newIt.total; }
-            else { mergedItems.push(newIt); }
+            else { mergedItems.push(Object.assign({}, newIt)); }
           });
           var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
-          var mergedDiscount = freshOrder.discountFromPoints || 0;
-          t.update(orderRef, { items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal - mergedDiscount, stockReserved: true });
+          var mergedPoints = (freshOrder.pointsRedeemed || 0) + (isRepOrder ? 0 : pointsRedeemed);
+          var mergedDiscount = (freshOrder.discountFromPoints || 0) + (isRepOrder ? 0 : discount);
+          var additions = (freshOrder.additions || []).slice();
+          additions.push({ source: isRepOrder ? 'rep' : 'customer', repCode: isRepOrder && currentRep ? currentRep.code : '', repName: isRepOrder && currentRep ? currentRep.name : '', at: Date.now(), total: cartTotal, itemsCount: items.length });
+          var upd = { items: mergedItems, subtotal: mergedSubtotal, pointsRedeemed: mergedPoints, discountFromPoints: mergedDiscount, total: Math.max(0, mergedSubtotal - mergedDiscount), stockReserved: true, additions: additions, updatedAt: Date.now() };
+          // لو الطلب الأصلي من العميل والمندوب زوّد عليه، المندوب يتسجل على الطلب عشان مبيعاته متضيعش
+          if (isRepOrder && currentRep && !freshOrder.repCode) { upd.repCode = currentRep.code; upd.repName = currentRep.name; }
+          t.update(orderRef, upd);
         });
       });
     }).then(function(){
       cart = {};
       localStorage.setItem('app_cart', '{}');
       scheduleCartSync();
+      if (!isRepOrder) redeemPointsChecked = false;
       updateCartBadge();
       showLoading(false);
-      showToast('تمت إضافة الأصناف لطلبك السابق #' + openOrder.id.slice(-6) + ' ✓');
-      switchTopTab('home'); switchScreen('home');
+      if (isRepOrder) {
+        var doneForName = repTargetCustomer.name || repTargetCustomer.code;
+        repTargetCustomer = null;
+        document.getElementById('repOrderBanner').style.display = 'none';
+        var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
+        switchScreenRaw('repHome');
+        setNavRoot('repHome', 'switchScreen');
+        renderRepHome();
+        showToast('العميل ' + doneForName + ' كان عنده طلب النهارده — الأصناف اتضافت على نفس الطلب #' + openOrder.id.slice(-6) + ' ✓');
+      } else {
+        showToast('تمت إضافة الأصناف لطلبك السابق #' + openOrder.id.slice(-6) + ' ✓');
+        switchTopTab('home'); switchScreen('home');
+      }
     }).catch(function(err){
       if (err && err.code === 'ORDER_MOVED') { createNewOrder(true); return; }   // الكمية محجوزة بالفعل
       console.error('Order merge failed:', err);
@@ -2565,9 +2615,12 @@ function sendOrderToServer(){
       if (!(err && /غير متوفرة/.test(err.message || ''))) returnStockForItems(items).catch(function(){});
       showToast(err && err.message ? err.message : 'تعذر تحديث الطلب، حاول تاني', 'error');
     });
-    return;
-  }
-  createNewOrder(false);
+  }).catch(function(err){
+    // لو معرفناش نتأكد من طلبات العميل (النت مثلاً)، منبعتش طلب منفصل على عماه - نطلب منه يحاول تاني
+    console.error('find open order failed:', err);
+    showLoading(false);
+    showToast('تعذر الاتصال، حاول تاني بعد لحظات', 'error');
+  });
 
   function createNewOrder(alreadyReserved){
   var reservedNow = false;
