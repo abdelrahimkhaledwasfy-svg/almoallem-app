@@ -434,7 +434,9 @@
         <div class="rep-stat"><b id="deliveryStatPending">0</b><span>بانتظار التسليم</span></div>
         <div class="rep-stat"><b id="deliveryStatDone">0</b><span>تم تسليمه النهاردة</span></div>
         <div class="rep-stat"><b id="deliveryStatTotal">0</b><span>إجمالي المحصّل</span></div>
+        <div class="rep-stat"><b id="deliveryStatReturns">0</b><span>مرتجع معاك</span></div>
       </div>
+      <button onclick="openDeliveryDayReport()" style="margin-top:10px;width:100%;background:rgba(255,255,255,0.15);color:#fff;border-radius:12px;padding:9px;font-size:11.5px;font-weight:900;"><i class="fas fa-clipboard-list"></i> تقرير اليوم: الفلوس والمرتجع</button>
     </div>
     <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
     <div id="deliveryInvoicesList" style="margin:0 16px 24px;"></div>
@@ -678,6 +680,24 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="deliveryInvoiceModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);"><i class="fas fa-file-invoice"></i> الفاتورة</div>
+      <button onclick="closeModalOverlay('deliveryInvoiceModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <div id="deliveryInvoiceBody"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="deliveryDayReportModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);"><i class="fas fa-clipboard-list"></i> تقرير اليوم</div>
+      <button onclick="closeModalOverlay('deliveryDayReportModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <div id="deliveryDayReportBody"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="deliveryRejectModal">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -690,6 +710,8 @@
       <select class="form-input" id="deliveryRejectReasonSelect">
         <option value="العميل غير موجود">العميل غير موجود</option>
         <option value="رفض الاستلام">رفض الاستلام</option>
+        <option value="تالف">تالف</option>
+        <option value="غلط في الطلب">غلط في الطلب</option>
         <option value="سبب آخر">سبب آخر</option>
       </select>
     </div>
@@ -732,7 +754,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-10-06-2';
+  var APP_BUILD = '2026-10-06-3';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1472,6 +1494,9 @@ function renderDeliveryHome(){
   document.getElementById('deliveryStatPending').textContent = deliveryInvoices.filter(function(o){ return !o.repDelivery && deliveryOwnership(o) !== 'other'; }).length;
   document.getElementById('deliveryStatDone').textContent = doneToday.length;
   document.getElementById('deliveryStatTotal').textContent = money(totalCollected);
+  var retEl = document.getElementById('deliveryStatReturns');
+  if (retEl) retEl.textContent = money(myRepReturns.filter(function(o){ return o.repReturnPending; }).reduce(function(s, o){ return s + (Number(o.repReturnValue) || 0); }, 0));
+  try { if (document.getElementById('deliveryInvoiceModal').classList.contains('show')) renderDeliveryInvoice(); } catch (e) {}
   renderDeliveryInvoicesList();
 }
 
@@ -1510,8 +1535,9 @@ function deliveryCardsHtml(list){
         '<div style="font-size:13px;font-weight:900;color:var(--maroon);">' + money(orderPayable(o)) + ' ج.م</div>' +
         '<div>' + callBtn + mapBtn + '</div>' +
       '</div>' +
-      (confirmed ? '<div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">بانتظار نظام المعلم يقفل الطلب ويعمل الفاتورة</div>' :
-      '<div style="display:flex;gap:8px;margin-top:10px;">' +
+      (confirmed ? '<div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">بانتظار نظام المعلم يقفل الطلب ويعمل الفاتورة' + (o.repReturns && o.repReturns.length ? ' — فيه مرتجع بـ ' + money(o.repReturnValue) + ' ج' : '') + '</div>' :
+      '<button onclick="openDeliveryInvoice(&#39;' + o.id + '&#39;)" style="width:100%;margin-top:10px;background:#fff;color:var(--maroon);border:1px solid var(--maroon);border-radius:12px;padding:9px;font-size:11px;font-weight:900;"><i class="fas fa-file-invoice"></i> الفاتورة / مرتجع</button>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;">' +
         '<button onclick="markInvoiceDelivered(&#39;' + o.id + '&#39;)" style="flex:1;background:var(--success);color:#fff;border-radius:12px;padding:10px;font-size:11px;font-weight:800;"><i class="fas fa-check"></i> تم التسليم والتحصيل</button>' +
         '<button onclick="openDeliveryRejectModal(&#39;' + o.id + '&#39;)" style="flex:1;background:var(--danger);color:#fff;border-radius:12px;padding:10px;font-size:11px;font-weight:800;"><i class="fas fa-xmark"></i> لم يتم</button>' +
       '</div>') +
@@ -1554,6 +1580,172 @@ function markInvoiceDelivered(orderId){
   }).then(function(){ delete deliveryBusy[orderId]; });
 }
 
+
+// ==================== فاتورة مندوب التسليم + المرتجع عند العميل (2026-10-06) ====================
+// المندوب يفتح الفاتورة، ولو العميل رجّع صنف يقلّل كميته (مايقدرش يزوّد ولا يضيف ولا يغيّر سعر) ويختار السبب.
+// الفاتورة بتتعمل في السيستم بالكميات اللي اتسلمت فعلاً، والمرتجع بيفضل "مع المندوب" لحد ما أمين المخزن يستلمه
+// (المخزون مبيزيدش غير وقت الاستلام). وآخر اليوم المندوب عنده تقرير بالتحصيل والمرتجع.
+var REP_RETURN_REASONS = ['تالف', 'منتهي الصلاحية', 'العميل مش عايزه', 'غلط في الطلب', 'سبب تاني'];
+var deliveryInvOrderId = null, deliveryReturnMode = false;
+var myRepReturns = [];
+var repReturnsListenerStarted = false;
+function startRepReturnsListener(){
+  if (!db || repReturnsListenerStarted || !currentRep) return;
+  repReturnsListenerStarted = true;
+  db.collection('customerOrders').where('repReturnRepCode', '==', currentRep.code).onSnapshot(function(snap){
+    myRepReturns = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    renderDeliveryHome();
+  }, function(err){ console.error('rep returns listener error:', err); });
+}
+function openDeliveryInvoice(orderId){
+  var o = deliveryInvoices.find(function(x){ return x.id === orderId; });
+  if (!o) return;
+  deliveryInvOrderId = orderId; deliveryReturnMode = false;
+  renderDeliveryInvoice();
+  openModalOverlay('deliveryInvoiceModal');
+}
+function toggleDeliveryReturnMode(){ deliveryReturnMode = !deliveryReturnMode; renderDeliveryInvoice(); }
+function deliveryReturnInputs(){
+  var out = [];
+  document.querySelectorAll('#deliveryInvoiceBody .dr-row').forEach(function(row){
+    var i = Number(row.getAttribute('data-i'));
+    var q = Number(String((row.querySelector('.dr-qty') || {}).value || '0').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })) || 0;
+    var r = (row.querySelector('.dr-reason') || {}).value || '';
+    out.push({ i: i, qty: q, reason: r });
+  });
+  return out;
+}
+// بيحسب الفاتورة بعد المرتجع: الأصناف الجديدة + تفاصيل المرتجع + المطلوب تحصيله
+function computeDeliveryAfterReturns(o, inputs){
+  var items = (o.items || []).map(function(it){ return Object.assign({}, it); });
+  var returns = [], err = '';
+  (inputs || []).forEach(function(x){
+    var it = items[x.i]; if (!it || !x.qty) return;
+    if (x.qty < 0 || x.qty > it.qty) { err = 'كمية المرتجع من ' + it.productName + ' لازم تكون من 0 لـ ' + it.qty; return; }
+    if (!x.reason) { err = 'اختار سبب المرتجع لـ ' + it.productName; return; }
+    var unitPrice = it.qty ? (Number(it.total) || (it.price * it.qty)) / it.qty : (Number(it.price) || 0);
+    var value = Math.round(unitPrice * x.qty * 100) / 100;
+    returns.push({ productCode: it.productCode, productName: it.productName, unit: it.unit, qty: x.qty, price: unitPrice, value: value, reason: x.reason, deductQty: computeStockDeductQty(it.productCode, it.unit, x.qty) });
+    it.qty = it.qty - x.qty;
+    it.total = Math.round(unitPrice * it.qty * 100) / 100;
+  });
+  var kept = items.filter(function(it){ return it.qty > 0; });
+  var subtotal = kept.reduce(function(s, it){ return s + (Number(it.total) || 0); }, 0);
+  var disc0 = Number(o.discountFromPoints) || 0, pts0 = Number(o.pointsRedeemed) || 0;
+  var disc = Math.min(disc0, subtotal);
+  var pts = disc0 > 0 ? Math.ceil(pts0 * disc / disc0) : pts0;
+  var returnsValue = returns.reduce(function(s, r){ return s + r.value; }, 0);
+  return { err: err, items: kept, returns: returns, subtotal: subtotal, discount: disc, points: pts, payable: Math.max(0, subtotal - disc), returnsValue: returnsValue, allReturned: !kept.length && returns.length > 0 };
+}
+function renderDeliveryInvoice(){
+  var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; });
+  var body = document.getElementById('deliveryInvoiceBody');
+  if (!o) { body.innerHTML = '<p style="text-align:center;color:var(--muted);">الطلب ده اتقفل</p>'; return; }
+  var prev = deliveryReturnInputs();
+  var confirmed = !!o.repDelivery;
+  var rows = (o.items || []).map(function(it, i){
+    var p = prev.find(function(x){ return x.i === i; }) || { qty: 0, reason: '' };
+    var line = '<tr><td style="padding:6px 4px;font-weight:800;">' + it.productName + '</td><td style="text-align:center;">' + it.qty + ' ' + (it.unit || '') + '</td><td style="text-align:center;">' + money(it.price) + '</td><td style="text-align:left;font-weight:800;">' + money(it.total) + '</td></tr>';
+    if (deliveryReturnMode && !confirmed) {
+      line += '<tr class="dr-row" data-i="' + i + '" style="background:#FFF4E5;"><td colspan="4" style="padding:6px 4px;"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;">' +
+        '<span style="font-weight:800;color:var(--danger);">رجّع:</span><input class="form-input dr-qty" type="number" inputmode="decimal" min="0" max="' + it.qty + '" step="1" value="' + (p.qty || '') + '" placeholder="0" style="width:70px;padding:6px;" oninput="updateDeliveryReturnSummary()"> <span>من ' + it.qty + ' ' + (it.unit || '') + '</span>' +
+        '<select class="form-input dr-reason" style="flex:1;min-width:120px;padding:6px;" onchange="updateDeliveryReturnSummary()"><option value="">السبب...</option>' + REP_RETURN_REASONS.map(function(r){ return '<option' + (p.reason === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div></td></tr>';
+    }
+    return line;
+  }).join('');
+  body.innerHTML =
+    '<div style="font-size:12px;margin-bottom:8px;"><b>' + (o.customerName || '') + '</b> <span style="color:var(--muted);">#' + o.id.slice(-6) + '</span><div style="color:var(--muted);font-size:10.5px;">' + [o.shopName, o.addressDetail, o.neighborhood].filter(Boolean).join(' - ') + '</div></div>' +
+    '<table style="width:100%;font-size:11.5px;border-collapse:collapse;"><thead><tr style="color:var(--muted);font-size:10px;"><th style="text-align:right;">الصنف</th><th>الكمية</th><th>السعر</th><th style="text-align:left;">الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div id="deliveryReturnSummary" style="margin-top:10px;"></div>' +
+    (confirmed ? '<div style="text-align:center;color:var(--muted);font-size:11px;margin-top:10px;">اتسجل تسليمه — بانتظار نظام المعلم</div>' :
+      '<button onclick="toggleDeliveryReturnMode()" style="width:100%;margin-top:10px;background:' + (deliveryReturnMode ? '#eee' : '#FFF4E5') + ';color:var(--danger);border:1px dashed var(--danger);border-radius:12px;padding:10px;font-size:11.5px;font-weight:900;"><i class="fas fa-rotate-left"></i> ' + (deliveryReturnMode ? 'إلغاء المرتجع' : 'العميل رجّع أصناف') + '</button>' +
+      '<button id="deliveryInvConfirmBtn" onclick="confirmDeliveryWithReturns()" style="width:100%;margin-top:8px;background:var(--success);color:#fff;border-radius:12px;padding:12px;font-size:12px;font-weight:900;"></button>');
+  updateDeliveryReturnSummary();
+}
+function updateDeliveryReturnSummary(){
+  var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; });
+  var box = document.getElementById('deliveryReturnSummary'); if (!o || !box) return;
+  var c = computeDeliveryAfterReturns(o, deliveryReturnMode ? deliveryReturnInputs() : []);
+  var line = function(t, v, color){ return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;' + (color ? 'color:' + color + ';' : '') + '"><span>' + t + '</span><b>' + v + '</b></div>'; };
+  box.innerHTML = line('إجمالي الفاتورة', money((o.items || []).reduce(function(s, it){ return s + (Number(it.total) || 0); }, 0)) + ' ج') +
+    (c.returnsValue ? line('المرتجع', '- ' + money(c.returnsValue) + ' ج', 'var(--danger)') : '') +
+    (c.discount ? line('خصم النقاط', '- ' + money(c.discount) + ' ج') : '') +
+    '<div style="border-top:1px dashed var(--border);margin-top:4px;padding-top:4px;">' + line('المطلوب تحصيله', money(c.payable) + ' ج', 'var(--maroon)') + '</div>' +
+    (c.err ? '<div style="color:var(--danger);font-size:11px;">' + c.err + '</div>' : '') +
+    (c.allReturned ? '<div style="color:var(--danger);font-size:11px;">العميل رجّع كل الأصناف — استخدم زرار "لم يتم" بدل كده.</div>' : '');
+  var btn = document.getElementById('deliveryInvConfirmBtn');
+  if (btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم التسليم وتحصيل ' + money(c.payable) + ' ج'; btn.disabled = !!c.err || c.allReturned; btn.style.opacity = btn.disabled ? .5 : 1; }
+}
+function confirmDeliveryWithReturns(){
+  var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; });
+  if (!o || o.repDelivery || deliveryBusy[o.id]) return;
+  if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
+  var inputs = deliveryReturnMode ? deliveryReturnInputs() : [];
+  var c0 = computeDeliveryAfterReturns(o, inputs);
+  if (c0.err) { showToast(c0.err, 'error'); return; }
+  if (c0.allReturned) { showToast('العميل رجّع كل حاجة — استخدم "لم يتم"', 'error'); return; }
+  if (!confirm('تأكيد تسليم ' + (o.customerName || '') + ' وتحصيل ' + money(c0.payable) + ' ج.م' + (c0.returns.length ? '\nومرتجع بـ ' + money(c0.returnsValue) + ' ج هيفضل معاك لحد ما تسلّمه للمخزن' : '') + '؟')) return;
+  var orderId = o.id;
+  deliveryBusy[orderId] = true;
+  var info = { code: currentRep ? currentRep.code : '', name: currentRep ? currentRep.name : '', at: Date.now() };
+  var orderRef = db.collection('customerOrders').doc(orderId);
+  var payable = 0;
+  db.runTransaction(function(t){
+    return t.get(orderRef).then(function(snap){
+      if (!snap.exists) throw new Error('الطلب مش موجود');
+      var d = snap.data();
+      if (d.status !== 'ready') throw new Error('حالة الطلب اتغيرت، اعمل تحديث');
+      if (d.repDelivery) throw new Error('الطلب ده اتسجل تسليمه قبل كده');
+      // بنحسب من أحدث نسخة للطلب (مش المحفوظة على الموبايل)
+      var c = computeDeliveryAfterReturns(Object.assign({ id: orderId }, d), inputs);
+      if (c.err) throw new Error(c.err);
+      if (c.allReturned) throw new Error('العميل رجّع كل حاجة — استخدم "لم يتم"');
+      payable = c.payable;
+      var upd = { repDelivery: info };
+      if (c.returns.length) {
+        Object.assign(upd, {
+          originalItems: d.originalItems || d.items, items: c.items, subtotal: c.subtotal, discountFromPoints: c.discount, pointsRedeemed: c.points, total: c.payable,
+          repReturns: c.returns, repReturnValue: c.returnsValue, repReturnAt: Date.now(), repReturnRepCode: info.code, repReturnRepName: info.name,
+          repReturnPending: true, hasRepReturn: true, holdReturnStock: true, repReturnKind: 'partial'
+        });
+      } else payable = orderPayable(Object.assign({}, d));
+      t.update(orderRef, upd);
+    });
+  }).then(function(){
+    var record = { id: 'DLV-ORD-' + orderId, date: new Date().toISOString(), repUsername: info.code, repFullName: info.name,
+      orderId: orderId, invoiceId: null, invoiceNumber: '', customerName: o.customerName || '', amount: payable };
+    return db.collection('deliveryCollectionRecords').doc(record.id).set(record, { merge: true });
+  }).then(function(){
+    closeModalOverlay('deliveryInvoiceModal');
+    showToast(c0.returns.length ? 'تم التسليم ✓ والمرتجع اتسجل عليك' : 'تم تسجيل التسليم والتحصيل ✓');
+  }).catch(function(e){
+    console.error('delivery with returns failed:', e);
+    showToast(e && e.message ? e.message : 'تعذر تسجيل التسليم', 'error');
+  }).then(function(){ delete deliveryBusy[orderId]; });
+}
+
+// تقرير آخر اليوم: التحصيل + المرتجع
+function isTodayTs(ts){ return ts && new Date(ts).toDateString() === new Date().toDateString(); }
+function openDeliveryDayReport(){
+  var money0 = deliveryHistoryInvoices.filter(function(r){ return r.date && isTodayTs(r.date); });
+  var rets = myRepReturns.filter(function(o){ return isTodayTs(o.repReturnAt); });
+  var totalMoney = money0.reduce(function(s, r){ return s + (Number(r.amount) || 0); }, 0);
+  var totalRet = rets.reduce(function(s, o){ return s + (Number(o.repReturnValue) || 0); }, 0);
+  var byProd = {};
+  rets.forEach(function(o){ (o.repReturns || []).forEach(function(r){ var k = r.productCode + '|' + r.unit; var e = byProd[k] || (byProd[k] = { name: r.productName, unit: r.unit, qty: 0, value: 0 }); e.qty += Number(r.qty) || 0; e.value += Number(r.value) || 0; }); });
+  var sec = function(t){ return '<div style="font-size:12px;font-weight:900;color:var(--maroon);margin:14px 0 6px;">' + t + '</div>'; };
+  var row = function(a, b, c){ return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 0;border-bottom:1px dashed var(--border);"><span>' + a + '</span><span style="color:var(--muted);">' + (c || '') + '</span><b>' + b + '</b></div>'; };
+  document.getElementById('deliveryDayReportBody').innerHTML =
+    '<div style="display:flex;gap:8px;"><div style="flex:1;background:#E1F5EE;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">فلوس معاك</div><b style="font-size:15px;">' + money(totalMoney) + ' ج</b></div>' +
+    '<div style="flex:1;background:#FFF4E5;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">مرتجع معاك</div><b style="font-size:15px;color:var(--danger);">' + money(totalRet) + ' ج</b></div></div>' +
+    sec('التحصيل (' + money0.length + ')') + (money0.map(function(r){ return row(r.customerName || '', money(r.amount) + ' ج', r.invoiceNumber ? '#' + r.invoiceNumber : ''); }).join('') || '<div style="font-size:11px;color:var(--muted);">مفيش</div>') +
+    sec('المرتجع حسب الصنف') + (Object.keys(byProd).map(function(k){ var e = byProd[k]; return row(e.name, money(e.value) + ' ج', e.qty + ' ' + (e.unit || '')); }).join('') || '<div style="font-size:11px;color:var(--muted);">مفيش مرتجع النهارده</div>') +
+    (rets.length ? sec('المرتجع حسب العميل') + rets.map(function(o){ return '<div style="font-size:11.5px;padding:6px 0;border-bottom:1px dashed var(--border);"><div style="display:flex;justify-content:space-between;"><b>' + (o.customerName || '') + (o.repReturnKind === 'full' ? ' <span style="color:var(--danger);font-size:10px;">(الطلب كله)</span>' : '') + '</b><b style="color:var(--danger);">' + money(o.repReturnValue) + ' ج</b></div>' +
+      (o.repReturns || []).map(function(r){ return '<div style="color:var(--muted);font-size:10.5px;">• ' + r.productName + ' × ' + r.qty + ' ' + (r.unit || '') + ' — ' + r.reason + '</div>'; }).join('') +
+      '<div style="font-size:10px;margin-top:2px;color:' + (o.repReturnPending ? 'var(--danger)' : 'var(--success)') + ';">' + (o.repReturnPending ? 'لسه معاك — سلّمه للمخزن' : '✓ اتسلّم للمخزن') + '</div></div>'; }).join('') : '');
+  openModalOverlay('deliveryDayReportModal');
+}
+
 function openDeliveryRejectModal(orderId){
   document.getElementById('deliveryRejectInvoiceId').value = orderId;
   document.getElementById('deliveryRejectReasonSelect').value = 'العميل غير موجود';
@@ -1573,15 +1765,20 @@ function confirmDeliveryReject(){
       var d = snap.data();
       if (d.status !== 'ready' || d.repDelivery) throw new Error('حالة الطلب اتغيرت، اعمل تحديث');
       // نفس اللي بيعمله نظام المعلم لما الطلب يرجع: المخزون المحجوز بيرجع متاح تلقائيًا
+      // البضاعة بتفضل مع المندوب (مش بترجع المخزون) لحد ما أمين المخزن يستلمها
+      var rets = (d.items || []).map(function(it){ return { productCode: it.productCode, productName: it.productName, unit: it.unit, qty: it.qty, price: it.qty ? (Number(it.total) || 0) / it.qty : (Number(it.price) || 0), value: Number(it.total) || 0, reason: reason, deductQty: computeStockDeductQty(it.productCode, it.unit, it.qty) }; });
       t.update(orderRef, {
         status: 'returned', returnedAt: Date.now(), returnedBy: currentRep ? ('rep:' + currentRep.code) : 'rep',
         returnReason: reason + (detail ? (' - ' + detail) : ''),
-        returnedByRepName: currentRep ? currentRep.name : ''
+        returnedByRepName: currentRep ? currentRep.name : '',
+        repReturns: rets, repReturnValue: rets.reduce(function(s, r){ return s + r.value; }, 0), repReturnAt: Date.now(),
+        repReturnRepCode: currentRep ? currentRep.code : '', repReturnRepName: currentRep ? currentRep.name : '',
+        repReturnPending: true, hasRepReturn: true, holdReturnStock: true, repReturnKind: 'full'
       });
     });
   }).then(function(){
     closeModalOverlay('deliveryRejectModal');
-    showToast('تم تسجيل عدم التسليم، والطلب اتحول مرتجع');
+    showToast('تم تسجيل عدم التسليم — البضاعة اتسجلت مرتجع معاك لحد ما تسلّمها للمخزن');
   }).catch(function(e){ console.error(e); showToast(e && e.message ? e.message : 'تعذر التسجيل', 'error'); });
 }
 
@@ -1749,6 +1946,7 @@ function startApp(){
       renderDeliveryHome();
       startDeliveryInvoicesListener();
       startDeliveryHistoryListener();
+      startRepReturnsListener();
     } else {
       switchScreenRaw('repHome');
       setNavRoot('repHome', 'switchScreen');
