@@ -416,6 +416,9 @@
       <div id="repClientResults" style="max-height:260px;overflow-y:auto;"></div>
     </div>
 
+    <div id="repProgressCard" style="margin:16px 16px 0;"></div>
+    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-receipt"></i> طلباتي</div>
+    <div id="repOrdersList" style="margin:0 16px;"></div>
     <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-route"></i> آخر زياراتي</div>
     <div id="repVisitsList" style="margin:0 16px 24px;"></div>
   </div>
@@ -996,14 +999,51 @@ function listenProducts(){
 }
 
 // نفس الفكرة للعملاء (customerRecords) - مستخدمة في وضع المندوب لاختيار التاجر
+// (2026-10-08) قبل كده كل موبايل (حتى العميل العادي) كان بينزّل بيانات كل العملاء (أسامي وتليفونات وعناوين ومواقع ونقاط).
+// دلوقتي: مندوب البيع ينزّل عملاءه هو بس، والعميل ينزّل ملفه هو بس (لو ليه أكتر من كود بنفس الرقم بيجوا كلهم)، ومندوب التسليم مش محتاجهم.
+function digitsOnly(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).replace(/\D/g, ''); }
+function myPhoneVariants(phone){
+  var raw = String(phone || '').trim(), last10 = digitsOnly(raw).slice(-10);
+  var out = [raw];
+  if (last10.length === 10) out.push('0' + last10, last10, '20' + last10, '+20' + last10);
+  return out.filter(function(v, i, a){ return v && a.indexOf(v) === i; }).slice(0, 10);
+}
+function customerIsMine(c){
+  var me = digitsOnly(customerPhone).slice(-10);
+  return String(c.code) === String(customerPhone) || (me && digitsOnly(c.phone).slice(-10) === me);
+}
 function listenCustomers(){
-  if (customersListenerStarted) return;
+  if (customersListenerStarted || !db) return;
+  var queries = [];
+  if (repMode && currentRep) {
+    if (currentRep.type !== 'sales') { allCustomers = []; setStorage('customers', []); return; }
+    var code = String(currentRep.code);
+    var codes = /^\d+$/.test(code) ? [code, Number(code)] : [code];
+    queries.push(db.collection('customerRecords').where('salesmanCode', 'in', codes));
+    allCustomers = allCustomers.filter(function(c){ return String(c.salesmanCode || '') === code; });
+  } else if (!isGuest && customerPhone) {
+    var vars = myPhoneVariants(customerPhone);
+    queries.push(db.collection('customerRecords').where('code', 'in', vars));
+    queries.push(db.collection('customerRecords').where('phone', 'in', vars));
+    allCustomers = allCustomers.filter(customerIsMine);
+  } else {
+    allCustomers = []; setStorage('customers', []); return;
+  }
+  setStorage('customers', allCustomers);   // بنمسح أي نسخة كاملة قديمة متخزنة على الموبايل
   customersListenerStarted = true;
-  db.collection('customerRecords').onSnapshot(function(snap){
-    allCustomers = snap.docs.map(function(d){ return d.data(); });
-    setStorage('customers', allCustomers);
-    if (repMode) refreshRepScreensIfNeeded();
-  }, function(err){ console.error('Customers listener error:', err); });
+  var parts = queries.map(function(){ return null; });
+  queries.forEach(function(q, idx){
+    q.onSnapshot(function(snap){
+      parts[idx] = snap.docs.map(function(d){ return d.data(); });
+      if (parts.some(function(p){ return p === null; })) return;
+      var byCode = {};
+      parts.forEach(function(p){ p.forEach(function(c){ byCode[String(c.code)] = c; }); });
+      allCustomers = Object.keys(byCode).map(function(k){ return byCode[k]; });
+      setStorage('customers', allCustomers);
+      if (repMode) refreshRepScreensIfNeeded();
+      else { try { loadLoyaltyPoints(); } catch (e) {} }
+    }, function(err){ console.error('Customers listener error:', err); });
+  });
 }
 
 // أرصدة المخزون الحية (نفس المجموعة اللي نظام المعلم بيرفعلها، ونفس المجموعة اللي بيتعمل عليها
@@ -1060,6 +1100,8 @@ function applyStoreData(data){
   // (المناطق الجغرافية ← الأحياء) بدل قائمة ثابتة جوه كود الأبليكشن كانت منفصلة تمامًا عنها -
   // كان ده سبب إن الأحياء اللي الأدمن بيكتبها ما كانتش بتظهر للعميل وقت التسجيل خالص.
   appNeighborhoods = data.appNeighborhoods || [];
+  repSalesTargets = data.salesTargets || {};
+  if (repMode && currentRep && currentRep.type === 'sales') { try { renderRepProgress(); } catch (e) {} }
   // كاش محلي، يستخدم بس لو فتح الأبليكشن من غير نت المرة الجاية
   setStorage('appCategories', data.appCategories || []);
   setStorage('appBrands', data.appBrands || []);
@@ -1287,9 +1329,11 @@ function timeAgoAr(ts){
 function renderRepHome(){
   document.getElementById('repWelcomeName').textContent = currentRep ? currentRep.name : '-';
   document.getElementById('repClientSearch').value = '';
+  renderRepProgress();
+  renderRepOrdersList();
   var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; });
-  var today = new Date().toDateString();
-  var todayVisits = mine.filter(function(v){ return new Date(v.date).toDateString() === today; });
+  var todayVisits = mine.filter(function(v){ return inCurrentSalesDay(v.date); });   // يوم البيع (9 الصبح لـ 9 الصبح)
+  repClientLimit = 40;
   document.getElementById('repStatVisits').textContent = todayVisits.length;
   document.getElementById('repStatSuccess').textContent = todayVisits.filter(function(v){ return v.status === 'ناجحة'; }).length;
   document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
@@ -1300,19 +1344,28 @@ function renderRepHome(){
 function lastVisitFor(code){
   return repVisits.find(function(v){ return String(v.customerCode) === String(code); });
 }
+var repClientLimit = 40;
+function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
 
 function renderRepClientResults(){
-  var q = (document.getElementById('repClientSearch').value || '').trim().toLowerCase();
+  var qRaw = (document.getElementById('repClientSearch').value || '').trim();
+  var q = qRaw.replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).toLowerCase();
+  var qDigits = digitsOnly(q);
   // كل مندوب مبيعات بيشوف عملاؤه هو بس (المربوطين بيه في قاعدة العملاء في نظام المعلم)
   var list = (currentRep && currentRep.type === 'sales')
     ? allCustomers.filter(function(c){ return String(c.salesmanCode || '') === String(currentRep.code); })
     : allCustomers;
   if (q) {
     list = list.filter(function(c){
-      return (c.name || '').toLowerCase().indexOf(q) !== -1 || (c.phone || '').indexOf(q) !== -1 || (c.code || '').toLowerCase().indexOf(q) !== -1;
+      return (c.name || '').toLowerCase().indexOf(q) !== -1 || (c.shopName || '').toLowerCase().indexOf(q) !== -1 ||
+        (qDigits.length >= 3 && digitsOnly(c.phone).indexOf(qDigits) !== -1) || String(c.code || '').toLowerCase().indexOf(q) !== -1;
     });
   }
-  list = list.slice(0, 40);
+  // الترتيب: اللي ماتزارش خالص الأول، وبعدين اللي آخر زيارة ليه أقدم (عشان المندوب يعرف مين محتاج زيارة)
+  var lastTs = function(c){ var lv = lastVisitFor(c.code); return lv ? new Date(lv.date).getTime() : 0; };
+  list = list.slice().sort(function(a, b){ return (lastTs(a) - lastTs(b)) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'); });
+  var totalCount = list.length;
+  list = list.slice(0, repClientLimit);
   var wrap = document.getElementById('repClientResults');
   if (list.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-magnifying-glass"></i><p>لا يوجد عملاء مطابقين</p></div>'; return; }
   wrap.innerHTML = list.map(function(c){
@@ -1331,7 +1384,9 @@ function renderRepClientResults(){
       (lv ? '<span class="client-visit-badge">زيارة ' + timeAgoAr(lv.date) + '</span>' : '') +
       '<i class="fas fa-chevron-left client-arrow"></i>' +
     '</div>';
-  }).join('');
+  }).join('') +
+  (totalCount > list.length ? '<button onclick="showMoreRepClients()" style="width:100%;margin-top:6px;background:#fff;color:var(--maroon);border:1px dashed var(--maroon);border-radius:12px;padding:10px;font-size:11.5px;font-weight:900;">عرض المزيد (' + (totalCount - list.length) + ' عميل كمان)</button>' : '') +
+  '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px;">' + totalCount + ' عميل — مترتبين: اللي محتاج زيارة الأول</div>';
 }
 
 function openRepClientActions(code){
@@ -1363,6 +1418,7 @@ function openRepVisitModal(){
   document.getElementById('repVisitFailBtn').style.opacity = '1';
   repPendingLocation = null;
   openModalOverlay('repVisitModal');
+  captureRepVisitLocation();   // (2026-10-08) أوتوماتيك بدل ما المندوب ينساه، والزرار موجود لو عايز يعيد
 }
 
 function setRepVisitStatus(status){
@@ -1382,8 +1438,66 @@ function captureRepVisitLocation(){
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
+// (2026-10-08) الزيارات كانت بتتبعت للسيستم مرة واحدة، ولو النت فاصل كانت بتضيع، وتاريخ الزيارات كان على الموبايل بس.
+// دلوقتي: الزيارة بتتعلم "لسه مابعتتش" لحد ما توصل، وبنعيد المحاولة كل دقيقة ولما النت يرجع، والقايمة بتتقري من السحابة.
+var repVisitsListenerStarted = false, repVisitsFirstSync = true;
+function saveRepVisitsLocal(){ try { localStorage.setItem('app_rep_visits', JSON.stringify(repVisits.slice(0, 300))); } catch (e) {} }
+function cleanVisitForCloud(v){ var o = Object.assign({}, v); delete o._pending; return o; }
+function flushPendingVisits(){
+  if (!db) return;
+  repVisits.filter(function(v){ return v._pending && !v._sending; }).forEach(function(v){
+    v._sending = true;
+    db.collection('customerVisitRecords').doc(String(v.id)).set(cleanVisitForCloud(v)).then(function(){
+      delete v._pending; saveRepVisitsLocal();
+    }).catch(function(e){ console.error('visit sync failed (هتتعاد):', e); }).then(function(){ delete v._sending; });
+  });
+}
+function startRepVisitsListener(){
+  if (!db || repVisitsListenerStarted || !currentRep || currentRep.type !== 'sales') return;
+  repVisitsListenerStarted = true;
+  db.collection('customerVisitRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
+    var cloud = snap.docs.map(function(d){ return d.data(); });
+    var ids = {}; cloud.forEach(function(v){ ids[String(v.id)] = true; });
+    // أول مرة: أي زيارة قديمة على الموبايل ومش موجودة على السحابة بنرفعها (ممكن تكون ضاعت قبل الإصلاح ده)
+    var localOnly = repVisits.filter(function(v){ return !ids[String(v.id)] && (v._pending || (repVisitsFirstSync && v.repUsername === currentRep.code)); });
+    localOnly.forEach(function(v){ v._pending = true; });
+    repVisitsFirstSync = false;
+    repVisits = localOnly.concat(cloud).sort(function(a, b){ return String(b.date).localeCompare(String(a.date)); });
+    saveRepVisitsLocal();
+    flushPendingVisits();
+    refreshRepScreensIfNeeded();
+  }, function(err){ console.error('rep visits listener error:', err); });
+  setInterval(flushPendingVisits, 60000);
+  window.addEventListener('online', flushPendingVisits);
+}
+function recordRepVisit(visit){
+  visit._pending = true;
+  repVisits.unshift(visit);
+  saveRepVisitsLocal();
+  flushPendingVisits();
+}
+// بعد ما المندوب يعمل طلب لعميل: بتتسجل زيارة ناجحة أوتوماتيك (الطلب والزيارة مربوطين)
+function logOrderVisit(cust, orderId, total, merged){
+  if (!cust || !currentRep) return;
+  var visit = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), date: new Date().toISOString(),
+    customerCode: cust.code, customerName: cust.name || cust.code,
+    repUsername: currentRep.code, repFullName: currentRep.name || '',
+    status: 'ناجحة', purpose: 'طلب', notes: (merged ? 'إضافة على طلب ' : 'طلب ') + '#' + String(orderId || '').slice(-6) + ' بـ ' + money(total) + ' ج',
+    orderId: orderId || '', auto: true, repLocation: null, customerLocation: cust.location || null
+  };
+  recordRepVisit(visit);
+  // الموقع لو متاح بسرعة بيتضاف على نفس الزيارة
+  if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function(pos){
+    visit.repLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    if (!visit.customerLocation) visit.customerLocation = visit.repLocation;
+    visit._pending = true; saveRepVisitsLocal(); flushPendingVisits();
+  }, function(){}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 });
+}
+
 function saveRepVisit(){
   if (!repVisitStatusValue) { showToast('اختر حالة الزيارة'); return; }
+  if (!repPendingLocation && !confirm('موقعك لسه ماتسجلش (فعّل الـ GPS). تحفظ الزيارة من غير موقع؟')) return;
   if (!repTargetCustomer) return;
   var cust = repTargetCustomer;
   var purpose = document.getElementById('repVisitPurpose').value.trim();
@@ -1398,10 +1512,8 @@ function saveRepVisit(){
     repLocation: repPendingLocation || null,
     customerLocation: (cust.location || repPendingLocation || null)
   };
-  repVisits.unshift(visit);
-  localStorage.setItem('app_rep_visits', JSON.stringify(repVisits));
+  recordRepVisit(visit);
   if (db) {
-    db.collection('customerVisitRecords').doc(String(visit.id)).set(visit).catch(function(e){ console.error('visit sync failed:', e); });
     // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
     if (!cust.location && repPendingLocation) {
       cust.location = repPendingLocation;
@@ -1412,6 +1524,71 @@ function saveRepVisit(){
   closeModalOverlay('repVisitModal');
   showToast('تم حفظ الزيارة ✓');
   renderRepHome();
+}
+
+// ==================== طلباتي + هدفي الشهر ده (2026-10-08) ====================
+var repSalesTargets = {};
+var repMyOrders = [], repOrdersListenerStarted = false;
+function startRepOrdersListener(){
+  if (!db || repOrdersListenerStarted || !currentRep || currentRep.type !== 'sales') return;
+  repOrdersListenerStarted = true;
+  db.collection('customerOrders').where('repCode', '==', currentRep.code).onSnapshot(function(snap){
+    repMyOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+      .sort(function(a, b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
+    if (document.getElementById('repHomeScreen') && document.getElementById('repHomeScreen').classList.contains('active')) renderRepOrdersList();
+  }, function(err){ console.error('rep orders listener error:', err); });
+}
+var repOrdersShowAll = false;
+function toggleRepOrdersAll(){ repOrdersShowAll = !repOrdersShowAll; renderRepOrdersList(); }
+function renderRepOrdersList(){
+  var wrap = document.getElementById('repOrdersList'); if (!wrap) return;
+  var todayList = repMyOrders.filter(function(o){ return inCurrentSalesDay(getTimeValue(o.createdAt)); });
+  var list = repOrdersShowAll ? repMyOrders.slice(0, 50) : todayList;
+  var head = '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--muted);margin-bottom:6px;"><span>' +
+    (repOrdersShowAll ? 'آخر ' + list.length + ' طلب' : 'طلبات النهارده: ' + todayList.length + ' بـ ' + money(todayList.reduce(function(s, o){ return s + (Number(o.total) || 0); }, 0)) + ' ج') +
+    '</span><button onclick="toggleRepOrdersAll()" style="color:var(--maroon);font-weight:900;font-size:10.5px;">' + (repOrdersShowAll ? 'النهارده بس' : 'كل الطلبات') + '</button></div>';
+  if (!list.length) { wrap.innerHTML = head + '<div class="rep-empty"><i class="fas fa-receipt"></i><p>' + (repOrdersShowAll ? 'لسه ماعملتش طلبات' : 'ماعملتش طلبات النهارده لسه') + '</p></div>'; return; }
+  wrap.innerHTML = head + list.map(function(o){
+    var st = STATUS_LABELS[o.status] || STATUS_LABELS.pending;
+    var color = isDeliveredStatus(o.status) ? '#0F6E56' : ((o.status === 'returned' || o.status === 'rejected') ? 'var(--danger)' : 'var(--maroon)');
+    var stText = o.status === 'pending' ? 'جديد' : st[0];
+    return '<div class="visit-card"><div class="visit-card-top"><span style="font-size:11.5px;font-weight:800;">' + (o.customerName || '') + ' <span style="font-size:9.5px;color:var(--muted);">#' + String(o.id).slice(-6) + '</span></span>' +
+      '<span style="font-size:10px;font-weight:900;color:' + color + ';">' + stText + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px;"><span><i class="fas fa-clock" style="width:11px;"></i> ' + new Date(getTimeValue(o.createdAt)).toLocaleString('ar-EG') + ' — ' + (o.items || []).length + ' صنف</span><b style="color:var(--maroon);">' + money(o.total) + ' ج</b></div>' +
+      (o.status === 'returned' && o.returnReason ? '<div style="font-size:10px;color:var(--danger);margin-top:3px;">السبب: ' + o.returnReason + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// الهدف بيتحط من شاشة مشرف المبيعات، والمحقق بيحسبه نظام المعلم بنفس طريقة لوحة المشرف وبيبعته (meta/repProgress)
+var repProgressDoc = null, repProgressListenerStarted = false;
+function startRepProgressListener(){
+  if (!db || repProgressListenerStarted || !currentRep || currentRep.type !== 'sales') return;
+  repProgressListenerStarted = true;
+  db.collection('meta').doc('repProgress').onSnapshot(function(snap){
+    repProgressDoc = snap.exists ? (snap.data() || {}) : null;
+    renderRepProgress();
+  }, function(err){ console.error('rep progress listener error:', err); });
+}
+function repMonthKey(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function renderRepProgress(){
+  var box = document.getElementById('repProgressCard'); if (!box || !currentRep) return;
+  var key = repMonthKey(new Date());
+  var target = Number(((repSalesTargets || {})[key] || {})[currentRep.code]) || 0;
+  var p = repProgressDoc && repProgressDoc.monthKey === key ? ((repProgressDoc.reps || {})[String(currentRep.code)] || { month: 0, today: 0 }) : null;
+  if (!target && !p) { box.innerHTML = ''; return; }
+  var achieved = p ? (Number(p.month) || 0) : 0;
+  var pct = target ? Math.min(100, Math.round(achieved / target * 100)) : 0;
+  var now = new Date(), daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), daysLeft = daysIn - now.getDate() + 1;
+  var remain = Math.max(0, target - achieved);
+  box.innerHTML = '<div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:12px 14px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:900;color:var(--maroon);"><span><i class="fas fa-bullseye"></i> هدفي الشهر ده</span>' + (target ? '<span>' + pct + '%</span>' : '') + '</div>' +
+    (target ? '<div style="height:9px;background:var(--sand);border-radius:6px;margin:9px 0 7px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + (pct >= 100 ? 'var(--success)' : 'var(--maroon)') + ';border-radius:6px;"></div></div>' : '') +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;"><span>المحقق: <b>' + (p ? money(achieved) + ' ج' : '—') + '</b></span>' + (target ? '<span>الهدف: <b>' + money(target) + ' ج</b></span>' : '<span style="color:var(--muted);">مفيش هدف متحدد</span>') + '</div>' +
+    (p ? '<div style="font-size:10.5px;margin-top:4px;">مبيعات النهارده: <b>' + money(p.today || 0) + ' ج</b></div>' : '') +
+    (target && remain > 0 ? '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;">فاضلك ' + money(remain) + ' ج في ' + daysLeft + ' يوم — يعني حوالي ' + money(Math.ceil(remain / daysLeft)) + ' ج في اليوم</div>' : (target ? '<div style="font-size:11px;color:var(--success);font-weight:900;margin-top:4px;">🎉 حققت الهدف</div>' : '')) +
+    (repProgressDoc && repProgressDoc.updatedAt ? '<div style="font-size:9.5px;color:var(--muted);margin-top:5px;">آخر تحديث ' + timeAgoAr(repProgressDoc.updatedAt) + ' — المبيعات بتتحسب لما الطلب يتسلّم</div>' : '<div style="font-size:9.5px;color:var(--muted);margin-top:5px;">المحقق هيظهر أول ما السيستم يتفتح</div>') +
+  '</div>';
 }
 
 function renderRepVisitsList(){
@@ -1437,9 +1614,11 @@ function startRepOrderFlow(){
   if (!repTargetCustomer) return;
   closeModalOverlay('repClientActionsModal');
   var targetPhone = repTargetCustomer.phone || repTargetCustomer.code;
+  redeemPointsChecked = false;   // (2026-10-08) علامة النقاط ماتنتقلش من عميل للي بعده
   showLoading(true);
-  loadRepTargetReservedPoints(repTargetCustomer.code, function(){});
-  // بنحمّل سلة العميل الحقيقية بتاعته من السحابة (لو هو حاطط فيها حاجة من موبايله) بدل ما نبدأ بسلة فاضية
+  // بنستنى النقاط المحجوزة وطلبات العميل الأول (عشان مايستخدمش نفس النقاط مرتين، ونعرف لو عنده طلب مفتوح)
+  // وبعدين بنحمّل سلة العميل الحقيقية بتاعته من السحابة (لو هو حاطط فيها حاجة من موبايله) بدل ما نبدأ بسلة فاضية
+  loadRepTargetReservedPoints(repTargetCustomer.code, function(){
   loadCartFromCloud(targetPhone, function(){
     showLoading(false);
     updateCartBadge();
@@ -1451,10 +1630,12 @@ function startRepOrderFlow(){
     setNavRoot('home', 'switchScreen');
     renderHome();
   });
+  });
 }
 
 function cancelRepOrderFlow(){
   repTargetCustomer = null;
+  redeemPointsChecked = false;
   cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
   document.getElementById('repOrderBanner').style.display = 'none';
   var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
@@ -2011,6 +2192,9 @@ function startApp(){
       switchScreenRaw('repHome');
       setNavRoot('repHome', 'switchScreen');
       renderRepHome();
+      startRepVisitsListener();
+      startRepOrdersListener();
+      startRepProgressListener();
     }
   } else {
     renderHome();
@@ -2043,7 +2227,13 @@ function loadMyOrders(){
 }
 
 function getMyLoyaltyPoints(){
-  if (repMode && repTargetCustomer) return repTargetCustomer.loyaltyPoints || 0;
+  if (repMode && repTargetCustomer) {
+    // (2026-10-08) النقاط ممكن تكون على كود تاني للعميل بنفس رقم التليفون
+    var tp = digitsOnly(repTargetCustomer.phone || repTargetCustomer.code).slice(-10);
+    var best = Number(repTargetCustomer.loyaltyPoints) || 0;
+    if (tp.length === 10) allCustomers.forEach(function(c){ if (digitsOnly(c.phone).slice(-10) === tp) best = Math.max(best, Number(c.loyaltyPoints) || 0); });
+    return best;
+  }
   var customers = getStorage('customers', []);
   for (var i = 0; i < customers.length; i++){ if (customers[i].code === customerPhone) return customers[i].loyaltyPoints || 0; }
   // العميل ممكن يكون متسجل في السيستم بكود تاني (C270) بنفس رقم تليفونه - النقاط بتتكتب على كل أكواده
@@ -2525,13 +2715,16 @@ function renderCart(){
   }).join('');
 
   var total = getCartTotal();
-  var openOrder = (!repMode && customerPhone) ? myOrders.find(function(o){ return o.status === 'pending'; }) : null;
+  var curDay = salesDayStartMs(Date.now());
+  var sameDayPending = function(o){ return o.status === 'pending' && salesDayStartMs(o.createdAt) === curDay; };
+  var openOrder = (repMode && repTargetCustomer) ? (repTargetPastOrders || []).find(sameDayPending)
+    : ((!repMode && customerPhone) ? myOrders.find(sameDayPending) : null);
   var belowMin = total < MIN_ORDER_AMOUNT && !openOrder;
   html += suggestionsHtml();
   html += '<div style="height:140px;"></div>' +
       '<div class="cart-footer">' +
       (belowMin ? '<div style="font-size:10.5px;font-weight:800;color:var(--danger);text-align:center;margin-bottom:8px;">الحد الأدنى للطلب ' + MIN_ORDER_AMOUNT + ' ج.م — ناقصك ' + money(MIN_ORDER_AMOUNT - total) + ' ج.م كمان</div>' :
-       (openOrder && total < MIN_ORDER_AMOUNT ? '<div style="font-size:10.5px;font-weight:800;color:var(--maroon);text-align:center;margin-bottom:8px;">هتتضاف الأصناف دي لطلبك السابق رقم #' + openOrder.id.slice(-6) + ' اللي لسه في انتظار التجهيز</div>' : '')) +
+       (openOrder && total < MIN_ORDER_AMOUNT ? '<div style="font-size:10.5px;font-weight:800;color:var(--maroon);text-align:center;margin-bottom:8px;">' + (repMode ? 'هتتضاف الأصناف دي على طلب العميل المفتوح النهارده رقم #' : 'هتتضاف الأصناف دي لطلبك السابق رقم #') + String(openOrder.id || '').slice(-6) + ' اللي لسه في انتظار التجهيز</div>' : '')) +
       '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:8px;"><span>الإجمالي</span><span style="font-weight:900;">' + money(total) + ' ج.م</span></div>' +
       '<button class="btn-primary" ' + (belowMin ? 'disabled' : '') + ' onclick="switchScreen(&#39;confirm&#39;)">متابعة الطلب</button></div>';
   wrap.innerHTML = html;
@@ -2839,8 +3032,9 @@ function sendOrderToServer(){
             else { mergedItems.push(Object.assign({}, newIt)); }
           });
           var mergedSubtotal = mergedItems.reduce(function(s, it){ return s + it.total; }, 0);
-          var mergedPoints = (freshOrder.pointsRedeemed || 0) + (isRepOrder ? 0 : pointsRedeemed);
-          var mergedDiscount = (freshOrder.discountFromPoints || 0) + (isRepOrder ? 0 : discount);
+          // (2026-10-08) خصم النقاط اللي المندوب اختاره كان بيتشال في صمت هنا، دلوقتي بيتضاف زي العميل بالظبط
+          var mergedPoints = (freshOrder.pointsRedeemed || 0) + pointsRedeemed;
+          var mergedDiscount = Math.min(mergedSubtotal, (freshOrder.discountFromPoints || 0) + discount);
           var additions = (freshOrder.additions || []).slice();
           additions.push({ source: isRepOrder ? 'rep' : 'customer', repCode: isRepOrder && currentRep ? currentRep.code : '', repName: isRepOrder && currentRep ? currentRep.name : '', at: Date.now(), total: cartTotal, itemsCount: items.length });
           var upd = { items: mergedItems, subtotal: mergedSubtotal, pointsRedeemed: mergedPoints, discountFromPoints: mergedDiscount, total: Math.max(0, mergedSubtotal - mergedDiscount), stockReserved: true, additions: additions, updatedAt: Date.now() };
@@ -2853,11 +3047,12 @@ function sendOrderToServer(){
       cart = {};
       localStorage.setItem('app_cart', '{}');
       scheduleCartSync();
-      if (!isRepOrder) redeemPointsChecked = false;
+      redeemPointsChecked = false;
       updateCartBadge();
       showLoading(false);
       if (isRepOrder) {
         var doneForName = repTargetCustomer.name || repTargetCustomer.code;
+        logOrderVisit(repTargetCustomer, openOrder.id, cartTotal, true);
         repTargetCustomer = null;
         document.getElementById('repOrderBanner').style.display = 'none';
         var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
@@ -2945,6 +3140,7 @@ function sendOrderToServer(){
     showToast(pointsRedeemed > 0 ? ('تم إرسال الطلب بنجاح ✓ وهيتخصم ' + pointsRedeemed + ' نقطة بعد التنفيذ') : 'تم إرسال الطلب بنجاح ✓');
     if (isRepOrder) {
       var doneForName = repTargetCustomer.name || repTargetCustomer.code;
+      logOrderVisit(repTargetCustomer, orderId, order.total, false);
       repTargetCustomer = null;
       document.getElementById('repOrderBanner').style.display = 'none';
       var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
