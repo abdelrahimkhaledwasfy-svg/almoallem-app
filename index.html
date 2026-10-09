@@ -758,7 +758,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-10-06-3';
+  var APP_BUILD = '2026-10-06-4';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -933,10 +933,17 @@ let repPendingLocation = null;
 let repVisitStatusValue = '';
 
 function money(n){ return (n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function showToast(msg, ms){
+// *** إصلاح 2026-10-06: كل رسايل الغلط في الأبليكشن كانت بتتنادي showToast(رسالة, 'error') والدالة كانت فاكرة ***
+// التاني ده "مدة"، فالرسالة كانت بتختفي في نفس اللحظة - العميل يدوس دخول ومايشوفش أي سبب. دلوقتي الغلط بيفضل 4 ثواني وبلون أحمر.
+var toastTimer = null;
+function showToast(msg, type, ms){
   var t = document.getElementById('toast');
+  if (typeof type === 'number') { ms = type; type = ''; }
+  var isErr = type === 'error';
   t.textContent = msg; t.classList.add('show');
-  setTimeout(function(){t.classList.remove('show');}, ms || 1800);
+  t.style.background = isErr ? '#B3261E' : '';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); t.style.background = ''; }, (typeof ms === 'number' && ms > 0) ? ms : (isErr ? 4500 : 2200));
 }
 function showLoading(v){ document.getElementById('loadingOverlay').classList.toggle('hidden', !v); }
 
@@ -2031,19 +2038,77 @@ function enterAsGuest(){
   startApp();
 }
 
+// ==================== توحيد رقم التليفون والرقم السري (2026-10-06) ====================
+// الموبايلات العربي بتكتب الأرقام كده ٠١٠... فالحساب كان بيتسجل/يتدور عليه برقم مختلف عن ١٠ و 010، والرقم السري
+// اللي اتكتب بالعربي ماكانش بيطابق اللي اتكتب بالإنجليزي. دلوقتي الأرقام بتتحول لإنجليزي، والدخول بيجرب كل الأشكال.
+function toLatinDigits(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }); }
+function toArabicDigits(v){ return String(v || '').replace(/[0-9]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.charAt(Number(d)); }); }
+function canonicalPhone(v){
+  var d = toLatinDigits(v).replace(/[^0-9]/g, '');
+  if (d.indexOf('0020') === 0) d = d.slice(4); else if (d.indexOf('20') === 0 && d.length === 12) d = d.slice(2);
+  if (d.length === 10 && d.charAt(0) === '1') d = '0' + d;
+  return d;
+}
+function phoneIdVariants(raw){
+  var c = canonicalPhone(raw), t = String(raw || '').trim();
+  var out = [c, t, t.replace(/\s+/g, ''), toArabicDigits(c), c.length === 11 ? c.slice(1) : '', c.length === 11 ? '+2' + c : ''];
+  return out.filter(function(x, i){ return x && out.indexOf(x) === i; });
+}
+async function findAppAccount(raw){
+  var ids = phoneIdVariants(raw);
+  for (var i = 0; i < ids.length; i++){
+    var doc = await db.collection('appCustomers').doc(ids[i]).get();
+    if (doc.exists) return { id: ids[i], data: doc.data() };
+  }
+  return null;
+}
+// عميل متسجل في السيستم (بكود زي C270) بنفس الرقم بس لسه معملش حساب على الأبليكشن
+function findSystemCustomerByPhone(raw){
+  var c = canonicalPhone(raw); if (!c) return null;
+  var list = getStorage('customers', []) || [];
+  for (var i = 0; i < list.length; i++){ if (canonicalPhone(list[i].phone) === c || canonicalPhone(list[i].code) === c) return list[i]; }
+  return null;
+}
+// الموبايل مش بيحتفظ بكل العملاء، فبندوّر في السحابة بالرقم نفسه بس
+async function findSystemCustomerByPhoneCloud(raw){
+  var local = findSystemCustomerByPhone(raw); if (local) return local;
+  if (!db) return null;
+  try {
+    var vars = phoneIdVariants(raw).slice(0, 10);
+    var snaps = await Promise.all([db.collection('customerRecords').where('phone', 'in', vars).limit(1).get(), db.collection('customerRecords').where('code', 'in', vars).limit(1).get()]);
+    for (var i = 0; i < snaps.length; i++) if (!snaps[i].empty) return snaps[i].docs[0].data();
+  } catch (e) { console.warn('system customer lookup failed', e); }
+  return null;
+}
+
 async function doLoginScreenSubmit(){
-  var phone = document.getElementById('loginPhone').value.trim();
+  var phoneRaw = document.getElementById('loginPhone').value.trim();
   var password = document.getElementById('loginPassword').value;
-  if (phone.length < 10) { showToast('ادخل رقم هاتف صحيح', 'error'); return; }
+  if (canonicalPhone(phoneRaw).length < 10) { showToast('ادخل رقم هاتف صحيح', 'error'); return; }
   if (!password) { showToast('ادخل الرقم السري', 'error'); return; }
   if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا', 'error'); return; }
   showLoading(true);
   try {
-    var doc = await db.collection('appCustomers').doc(phone).get();
-    if (!doc.exists) { showLoading(false); showToast('رقم الهاتف غير مسجل، من فضلك أنشئ حساب جديد', 'error'); return; }
-    var data = doc.data();
-    var hash = await hashPassword(password);
-    if (hash !== data.passwordHash) { showLoading(false); showToast('رقم الهاتف أو الرقم السري غلط', 'error'); return; }
+    var acc = await findAppAccount(phoneRaw);
+    if (!acc) {
+      showLoading(false);
+      var sysCust = await findSystemCustomerByPhoneCloud(phoneRaw);
+      if (sysCust) {
+        showToast('رقمك متسجل عندنا كعميل (' + (sysCust.shopName || sysCust.name || '') + ') بس لسه معملتش حساب على الأبليكشن — اعمل حساب بنفس الرقم', 'error', 6000);
+        showRegisterScreen();
+        try {
+          document.getElementById('regPhone').value = canonicalPhone(phoneRaw);
+          if (!document.getElementById('regCustomerName').value) document.getElementById('regCustomerName').value = sysCust.name || '';
+          if (!document.getElementById('regShopName').value) document.getElementById('regShopName').value = sysCust.shopName || sysCust.name || '';
+          if (!document.getElementById('regAddress').value) document.getElementById('regAddress').value = sysCust.address || '';
+        } catch (e) {}
+      } else showToast('رقم الهاتف غير مسجل، من فضلك أنشئ حساب جديد', 'error');
+      return;
+    }
+    var phone = acc.id, data = acc.data;
+    // الرقم السري: بنقارن بالشكلين (أرقام إنجليزي، وزي ما اتكتب) عشان الحسابات القديمة متقفلش
+    var okHash = (await hashPassword(toLatinDigits(password).trim())) === data.passwordHash || (await hashPassword(password)) === data.passwordHash || (await hashPassword(toArabicDigits(password))) === data.passwordHash;
+    if (!okHash) { showLoading(false); showToast('الرقم السري غلط. لو نسيته دوس "نسيت الرقم السري"', 'error'); return; }
     isGuest = false;
     customerPhone = phone;
     customerProfile = data.profile || {};
@@ -2072,9 +2137,9 @@ function requestPasswordReset(){
 async function doRegisterAndLogin(){
   var customerName = document.getElementById('regCustomerName').value.trim();
   var shopName = document.getElementById('regShopName').value.trim();
-  var phone = document.getElementById('regPhone').value.trim();
-  var password = document.getElementById('regPassword').value;
-  var passwordConfirm = document.getElementById('regPasswordConfirm').value;
+  var phone = canonicalPhone(document.getElementById('regPhone').value.trim());
+  var password = toLatinDigits(document.getElementById('regPassword').value).trim();
+  var passwordConfirm = toLatinDigits(document.getElementById('regPasswordConfirm').value).trim();
   var activationCodeInput = document.getElementById('regActivationCode').value.trim().toUpperCase();
   var addressDetail = document.getElementById('regAddress').value.trim();
   var neighborhood = document.getElementById('regNeighborhood').value;
@@ -2082,7 +2147,7 @@ async function doRegisterAndLogin(){
   var governorate = document.getElementById('regGovernorate').value;
 
   if (!customerName || !shopName || !addressDetail) { showToast('من فضلك أكمل كل البيانات المطلوبة', 'error'); return; }
-  if (phone.length < 10) { showToast('ادخل رقم هاتف صحيح', 'error'); return; }
+  if (!/^01[0-9]{9}$/.test(phone)) { showToast('ادخل رقم موبايل صحيح (11 رقم يبدأ بـ 01)', 'error'); return; }
   if (password.length < 6) { showToast('الرقم السري لازم يكون 6 أرقام على الأقل', 'error'); return; }
   if (!/^[0-9]+$/.test(password)) { showToast('الرقم السري لازم يكون أرقام فقط', 'error'); return; }
   if (password !== passwordConfirm) { showToast('الرقم السري وتأكيده مش متطابقين', 'error'); return; }
@@ -2101,8 +2166,8 @@ async function doRegisterAndLogin(){
 
   showLoading(true);
   try {
-    var existing = await db.collection('appCustomers').doc(phone).get();
-    if (existing.exists) { showLoading(false); showToast('رقم الهاتف ده مسجل بالفعل، جرب تسجيل الدخول', 'error'); return; }
+    var existing = await findAppAccount(phone);
+    if (existing) { showLoading(false); showToast('رقم الهاتف ده مسجل بالفعل، جرب تسجيل الدخول', 'error'); return; }
     var passwordHash = await hashPassword(password);
     var profile = { customerName: customerName, shopName: shopName, addressDetail: addressDetail, neighborhood: neighborhood, city: city, governorate: governorate, location: regLocationCoords };
     await db.collection('appCustomers').doc(phone).set({ phone: phone, passwordHash: passwordHash, profile: profile, createdAt: Date.now() });
