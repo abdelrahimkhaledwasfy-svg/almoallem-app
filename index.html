@@ -235,6 +235,8 @@
   .rep-empty p{font-size:11px;font-weight:700;}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100000;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
+  .notif-bell-btn{position:relative;width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+  .notif-bell-badge{position:absolute;top:-4px;left:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:#E53935;color:#fff;font-size:9.5px;font-weight:900;display:none;align-items:center;justify-content:center;}
   .modal-overlay{position:fixed;inset:0;background:rgba(36,21,18,0.5);z-index:90;display:none;align-items:flex-end;justify-content:center;}
   .modal-overlay.show{display:flex;}
   .modal-sheet{width:100%;max-width:480px;background:var(--cream);border-radius:24px 24px 0 0;padding:20px;max-height:85vh;overflow-y:auto;}
@@ -396,6 +398,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب</div>
           <div class="welcome-name" id="repWelcomeName">-</div>
         </div>
+        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
         <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
       <div class="rep-stats-row">
@@ -431,6 +434,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب تسليم</div>
           <div class="welcome-name" id="deliveryWelcomeName">-</div>
         </div>
+        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
         <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
       <div class="rep-stats-row">
@@ -454,6 +458,7 @@
           <div class="welcome-sub">أهلاً بك</div>
           <div class="welcome-name" id="welcomeName">-</div>
         </div>
+        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
       </div>
       <div style="position:relative;display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.2);">
         <span style="font-size:10.5px;font-weight:800;color:#F5D98A;">🔥 عروض متاحة دلوقتي</span>
@@ -739,6 +744,15 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="notifInboxModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:13.5px;font-weight:900;color:var(--maroon);"><i class="fas fa-bell"></i> الإشعارات</div>
+      <button onclick="closeNotifInbox()"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <div id="notifInboxBody"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="orderDetailModal">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
@@ -840,6 +854,96 @@ function initOneSignalForCustomer(){
         OneSignal.Notifications.requestPermission().catch(function(e){ console.error('OneSignal permission error:', e); });
       }, 4000);
     } catch(e) { console.error('OneSignal init error:', e); }
+  });
+}
+
+// ==================== جرس الإشعارات (2026-10-13) ====================
+// كل إشعار بيوصل على الموبايل، بيتحفظ كمان هنا عشان لو العميل/المندوب ماشافوش أو قافل الإشعارات.
+// العميل: appMeta/inbox_<رقمه> + appMeta/broadcasts (الإشعارات اللي اتبعتت لكل العملاء)
+// المندوب: appMeta/inbox_rep_<كوده>
+var notifInboxItems = [], notifInboxParts = {}, notifInboxStarted = false, notifInboxUnsubs = [];
+function notifEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function notifMyInboxKeys(){
+  if (repMode && currentRep) return ['inbox_rep_' + currentRep.code];
+  if (!customerPhone || isGuest) return ['broadcasts'];
+  var l = String(customerPhone).replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[^0-9]/g, '').slice(-10);
+  return [l.length === 10 ? 'inbox_0' + l : 'inbox_' + l, 'broadcasts'];
+}
+function notifSeenKey(){ return 'notif_seen_at_' + notifMyInboxKeys()[0]; }
+function startNotifInbox(){
+  if (notifInboxStarted) return;
+  if (!db) { setTimeout(startNotifInbox, 1500); return; }
+  notifInboxStarted = true;
+  // أول مرة خالص على الجهاز: الإشعارات القديمة متتحسبش "جديدة"
+  if (!localStorage.getItem(notifSeenKey())) { try { localStorage.setItem(notifSeenKey(), String(Date.now() - 3 * 86400000)); } catch (e) {} }
+  notifMyInboxKeys().forEach(function(k){
+    var unsub = db.collection('appMeta').doc(k).onSnapshot(function(snap){
+      notifInboxParts[k] = (snap.exists && snap.data().items) || [];
+      var all = [];
+      Object.keys(notifInboxParts).forEach(function(x){ all = all.concat(notifInboxParts[x]); });
+      notifInboxItems = all.sort(function(a, b){ return (b.at || 0) - (a.at || 0); }).slice(0, 60);
+      updateNotifBadges();
+      var m = document.getElementById('notifInboxModal');
+      if (m && m.classList.contains('show')) renderNotifInbox();
+    }, function(err){ console.error('notif inbox listener', k, err); });
+    notifInboxUnsubs.push(unsub);
+  });
+}
+function updateNotifBadges(){
+  var seenAt = Number(localStorage.getItem(notifSeenKey()) || 0);
+  var n = notifInboxItems.filter(function(x){ return (x.at || 0) > seenAt; }).length;
+  document.querySelectorAll('.notif-bell-badge').forEach(function(b){ b.textContent = n > 9 ? '9+' : n; b.style.display = n ? 'flex' : 'none'; });
+}
+function openNotifInbox(){
+  startNotifInbox();
+  renderNotifInbox();
+  document.getElementById('notifInboxModal').classList.add('show');
+  pushModalNav('notifInboxModal');
+  try { localStorage.setItem(notifSeenKey(), String(Date.now())); } catch (e) {}
+  setTimeout(updateNotifBadges, 50);
+}
+function closeNotifInbox(){ closeTrackedModal('notifInboxModal'); }
+function notifTimeAgo(t){
+  var m = Math.max(0, Math.round((Date.now() - (t || 0)) / 60000));
+  if (m < 1) return 'دلوقتي';
+  if (m < 60) return 'من ' + m + ' دقيقة';
+  if (m < 1440) return 'من ' + Math.floor(m / 60) + ' ساعة';
+  return new Date(t).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
+}
+function renderNotifInbox(){
+  var box = document.getElementById('notifInboxBody'); if (!box) return;
+  var seenAt = Number(localStorage.getItem(notifSeenKey()) || 0);
+  if (!notifInboxItems.length) { box.innerHTML = '<div class="empty-note"><i class="fas fa-bell-slash" style="font-size:28px;color:var(--border);display:block;margin-bottom:10px;"></i>مفيش إشعارات لسه</div>'; return; }
+  box.innerHTML = notifInboxItems.map(function(x, i){
+    var unread = (x.at || 0) > seenAt;
+    return '<div onclick="openNotifItem(' + i + ')" style="display:flex;gap:10px;padding:12px;border-radius:14px;margin-bottom:8px;cursor:pointer;background:' + (unread ? 'rgba(201,162,77,0.16)' : 'rgba(0,0,0,0.03)') + ';">' +
+      '<div style="width:34px;height:34px;border-radius:50%;background:var(--maroon);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas ' + (x.kind === 'order' ? 'fa-receipt' : x.kind === 'delivery' ? 'fa-truck' : 'fa-bullhorn') + '" style="font-size:13px;"></i></div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:900;color:var(--ink);">' + notifEsc(x.title) + '</div>' +
+      '<div style="font-size:11px;color:#6b5a4a;line-height:1.6;margin-top:2px;">' + notifEsc(x.body) + '</div>' +
+      (x.image ? '<img src="' + notifEsc(x.image) + '" style="width:100%;border-radius:10px;margin-top:6px;max-height:180px;object-fit:cover;" onerror="this.style.display=\'none\'">' : '') +
+      '<div style="font-size:9.5px;color:var(--muted);margin-top:4px;">' + notifTimeAgo(x.at) + '</div></div></div>';
+  }).join('');
+}
+function openNotifItem(i){
+  var x = notifInboxItems[i]; if (!x) return;
+  if (x.orderId && !repMode && typeof myOrders !== 'undefined' && myOrders.some(function(o){ return o.id === x.orderId; })) { closeNotifInbox(); setTimeout(function(){ openOrderDetail(x.orderId); }, 150); return; }
+  if (x.productCode && !repMode) {
+    var p = (typeof products !== 'undefined' ? products : []).find(function(q){ return q.code === x.productCode; });
+    closeNotifInbox();
+    setTimeout(function(){ switchScreen('search'); var s = document.getElementById('searchInput'); if (s) { s.value = p ? p.name : ''; try { renderSearchResults(); } catch (e) {} } }, 150);
+  }
+}
+// بيربط الموبايل بالإشعارات: العميل برقم تليفونه، والمندوب بـ rep_<كوده>
+function initOneSignalForRep(){
+  if (!repMode || !currentRep) return;
+  var ext = 'rep_' + currentRep.code;
+  if (window.AlmoallemAndroid) { try { AlmoallemAndroid.login(ext); } catch (e) { console.error(e); } return; }
+  window.OneSignalDeferred.push(async function(OneSignal){
+    try {
+      await OneSignal.init({ appId: ONESIGNAL_APP_ID, allowLocalhostAsSecureOrigin: true, serviceWorkerPath: 'almoallem-app/OneSignalSDKWorker.js', serviceWorkerParam: { scope: '/almoallem-app/' } });
+      await OneSignal.login(ext);
+      setTimeout(function(){ OneSignal.Notifications.requestPermission().catch(function(){}); }, 4000);
+    } catch(e) { console.error('OneSignal rep init error:', e); }
   });
 }
 
@@ -1295,6 +1399,9 @@ function checkRepStillActive(){
 }
 
 function repLogout(){
+  // الموبايل يبطل يستقبل إشعارات المندوب بعد الخروج
+  if (window.AlmoallemAndroid) { try { AlmoallemAndroid.logout(); } catch (e) {} }
+  else { try { window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); }); } catch (e) {} }
   repMode = false;
   currentRep = null;
   repTargetCustomer = null;
@@ -2267,7 +2374,8 @@ function startApp(){
   renderAdBanners();
   showLoading(false);
   initCloud();
-  if (!repMode) initOneSignalForCustomer();
+  if (!repMode) initOneSignalForCustomer(); else initOneSignalForRep();
+  startNotifInbox();
 }
 
 function listenMyOrders(){
