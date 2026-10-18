@@ -352,6 +352,10 @@
         <div class="input-wrap"><input type="tel" id="regPhone" placeholder="01xxxxxxxxx" dir="ltr" style="text-align:left;" maxlength="11"><i class="fas fa-phone"></i></div>
       </div>
       <div class="field">
+        <label>رقم تليفون صاحبك اللي عزمك (اختياري) 🎁</label>
+        <div class="input-wrap"><input type="tel" id="regReferredBy" placeholder="لو حد بعتلك الأبليكشن اكتب رقمه" dir="ltr" style="text-align:left;" maxlength="11"><i class="fas fa-gift"></i></div>
+      </div>
+      <div class="field">
         <label>الرقم السري</label>
         <div class="input-wrap"><input type="password" id="regPassword" placeholder="6 أرقام على الأقل" dir="ltr" inputmode="numeric" pattern="[0-9]*" style="text-align:left;"><i class="fas fa-lock"></i><i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('regPassword', this)"></i></div>
       </div>
@@ -483,6 +487,13 @@
       <a class="action-btn" href="tel:01155835917" style="text-decoration:none;background:#1e7a3d;color:#fff;"><i class="fas fa-phone"></i> اتصال بالمعلم</a>
       <a class="action-btn" href="https://chat.whatsapp.com/LGpJY9nsxKxDkMPmnVmxiy?s=cl&p=a&mlu=4" target="_blank" rel="noopener" style="text-decoration:none;background:#25D366;color:#fff;"><i class="fab fa-whatsapp"></i> جروب عملاء المعلم</a>
     </div>
+
+    <div id="promoCards"></div>
+
+    <div class="section-head" id="newArrivalsHead" style="display:none;"><div class="section-bar" style="background:#1e7a3d;"></div><div class="section-title">🆕 وصل جديد</div></div>
+    <div id="newArrivalsRow" class="prod-row"></div>
+    <div class="section-head" id="backInStockHead" style="display:none;"><div class="section-bar" style="background:#2563eb;"></div><div class="section-title">✅ رجع تاني</div></div>
+    <div id="backInStockRow" class="prod-row"></div>
 
     <div class="section-head" id="offersStripHead"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">عروض حصرية</div></div>
     <div id="offersStripRow" class="prod-row"></div>
@@ -917,7 +928,7 @@ function renderNotifInbox(){
   box.innerHTML = notifInboxItems.map(function(x, i){
     var unread = (x.at || 0) > seenAt;
     return '<div onclick="openNotifItem(' + i + ')" style="display:flex;gap:10px;padding:12px;border-radius:14px;margin-bottom:8px;cursor:pointer;background:' + (unread ? 'rgba(201,162,77,0.16)' : 'rgba(0,0,0,0.03)') + ';">' +
-      '<div style="width:34px;height:34px;border-radius:50%;background:var(--maroon);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas ' + (x.kind === 'order' ? 'fa-receipt' : x.kind === 'delivery' ? 'fa-truck' : 'fa-bullhorn') + '" style="font-size:13px;"></i></div>' +
+      '<div style="width:34px;height:34px;border-radius:50%;background:var(--maroon);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas ' + (x.kind === 'order' ? 'fa-receipt' : x.kind === 'delivery' ? 'fa-truck' : x.kind === 'points' ? 'fa-gift' : 'fa-bullhorn') + '" style="font-size:13px;"></i></div>' +
       '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:900;color:var(--ink);">' + notifEsc(x.title) + '</div>' +
       '<div style="font-size:11px;color:#6b5a4a;line-height:1.6;margin-top:2px;">' + notifEsc(x.body) + '</div>' +
       (x.image ? '<img src="' + notifEsc(x.image) + '" style="width:100%;border-radius:10px;margin-top:6px;max-height:180px;object-fit:cover;" onerror="this.style.display=\'none\'">' : '') +
@@ -1197,7 +1208,7 @@ function applyStoreData(data){
   appCategories = (data.appCategories || []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
   appBrands     = (data.appBrands || []).filter(function(b){ return b.active !== false; });
   appBanners    = (data.appBanners || []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appOffers     = (data.appOffers || []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
+  appOffers     = (data.appOffers || []).filter(offerIsLive);
   loyaltySettings = data.loyaltySettings || loyaltySettings;
   requireActivationCode = !!data.requireActivationCode;
   activationCodes = data.activationCodes || [];
@@ -1248,7 +1259,7 @@ function loadStoreDataFromLocalCache(){
   appCategories = getStorage('appCategories', []).filter(function(c){ return c.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
   appBrands     = getStorage('appBrands', []).filter(function(b){ return b.active !== false; });
   appBanners    = getStorage('appBanners', []).filter(function(b){ return b.active !== false; }).sort(function(a,b){ return (a.order||0)-(b.order||0); });
-  appOffers     = getStorage('appOffers', []).filter(function(o){ return o.active !== false && (!o.endDate || new Date(o.endDate) >= new Date()); });
+  appOffers     = getStorage('appOffers', []).filter(offerIsLive);
   stockLevels   = getStorage('inventory_stockLevels', {});
   requireActivationCode = getStorage('requireActivationCode', false);
   activationCodes = getStorage('activationCodes', []);
@@ -2277,7 +2288,11 @@ async function doRegisterAndLogin(){
     if (existing) { showLoading(false); showToast('رقم الهاتف ده مسجل بالفعل، جرب تسجيل الدخول', 'error'); return; }
     var passwordHash = await hashPassword(password);
     var profile = { customerName: customerName, shopName: shopName, addressDetail: addressDetail, neighborhood: neighborhood, city: city, governorate: governorate, location: regLocationCoords };
-    await db.collection('appCustomers').doc(phone).set({ phone: phone, passwordHash: passwordHash, profile: profile, createdAt: Date.now() });
+    var refEl = document.getElementById('regReferredBy');
+    var referredBy = refEl ? canonicalPhone(refEl.value.trim()) : '';
+    var regDoc = { phone: phone, passwordHash: passwordHash, profile: profile, createdAt: Date.now() };
+    if (/^01[0-9]{9}$/.test(referredBy) && referredBy !== phone) regDoc.referredBy = referredBy;
+    await db.collection('appCustomers').doc(phone).set(regDoc);
     if (matchedCode) {
       // بنسجل استخدام الكود في كوليكشن صغيرة منفصلة (مش هنكتب في بيانات المتجر مباشرة من الأبليكشن حفاظًا على الأمان)
       await db.collection('activationCodeUses').add({ code: matchedCode.code, usedBy: phone, usedAt: Date.now() });
@@ -2376,6 +2391,7 @@ function startApp(){
   initCloud();
   if (!repMode) initOneSignalForCustomer(); else initOneSignalForRep();
   startNotifInbox();
+  startPromo();
 }
 
 function listenMyOrders(){
@@ -2383,6 +2399,7 @@ function listenMyOrders(){
   db.collection('customerOrders').where('customerCode', '==', customerPhone).onSnapshot(function(snap){
     // الطلبات اللي السيستم ضمّها على طلب تاني لنفس اليوم (merged) مبتظهرش - أصنافها بقت جوه الطلب الأساسي
     myOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'merged'; });
+    try { renderPromoCards(); } catch (e) {}
     myOrders.sort(function(a,b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
     setStorage('customerOrders', myOrders);
     detectOrderStatusChanges(myOrders);
@@ -2584,6 +2601,7 @@ function renderHome(){
               .sort(function(a,b){ return (a.bestSellerOrder||0) - (b.bestSellerOrder||0); });
   document.getElementById('bestSellersHead').style.display = best.length ? 'flex' : 'none';
   bestRow.innerHTML = best.map(function(p){return productCardHtml(p);}).join('');
+  try { renderPromoCards(); renderBadgeRows(); } catch (e) { console.error(e); }
 }
 
 function renderAdBanners(){
@@ -2769,6 +2787,92 @@ function getUnitPrice(p, unit){
   return isSecondary ? (p.secondaryUnit ? p.secondaryUnit.price : p.price) : p.price;
 }
 
+
+// ==================== أدوات التسويق (2026-10-18) ====================
+// هات صاحبك + تحدي الشهر (الإعدادات من appMeta/promoSettings) + "وصل جديد / رجع تاني" (appMeta/productBadges)
+// + تسجيل آخر فتح للأبليكشن (customerCarts/seen_<رقم>) عشان المعلم يعرف مين فتح وما طلبش
+var promoSettings = null, productBadges = { newCodes: [], backCodes: [] }, promoStarted = false;
+var APP_STORE_LINK = 'https://play.google.com/store/apps/details?id=com.almoallem.app';
+function startPromo(){
+  if (promoStarted) return;
+  if (!db) { setTimeout(startPromo, 1500); return; }
+  promoStarted = true;
+  db.collection('appMeta').doc('promoSettings').onSnapshot(function(s){ promoSettings = (s.exists && s.data()) || null; renderPromoCards(); }, function(e){ console.error('promo', e); });
+  db.collection('appMeta').doc('productBadges').onSnapshot(function(s){ var d = (s.exists && s.data()) || {}; productBadges = { newCodes: d.newCodes || [], backCodes: d.backCodes || [] }; renderBadgeRows(); }, function(e){ console.error('badges', e); });
+  markAppSeen();
+}
+function markAppSeen(){
+  try {
+    if (!db || repMode || isGuest || !customerPhone) return;
+    var k = 'app_seen_at', last = Number(localStorage.getItem(k) || 0);
+    if (Date.now() - last < 20 * 60000) return;
+    localStorage.setItem(k, String(Date.now()));
+    var upd = { phone: customerPhone, lastSeenAt: Date.now(), name: (customerProfile && (customerProfile.shopName || customerProfile.customerName)) || '' };
+    if (firebase.firestore && firebase.firestore.FieldValue) upd.opens = firebase.firestore.FieldValue.increment(1);
+    db.collection('customerCarts').doc('seen_' + customerPhone).set(upd, { merge: true }).catch(function(e){ console.error('seen', e); });
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) markAppSeen(); });
+function monthDeliveredCount(){
+  var d = new Date();
+  return (myOrders || []).filter(function(o){ if (o.status !== 'delivered') return false; var t = new Date(o.deliveredAt || o.updatedAt || o.createdAt || 0); return t.getFullYear() === d.getFullYear() && t.getMonth() === d.getMonth(); }).length;
+}
+function renderPromoCards(){
+  var box = document.getElementById('promoCards'); if (!box) return;
+  if (repMode || isGuest || !promoSettings) { box.innerHTML = ''; return; }
+  var html = '';
+  var ch = promoSettings.challenge || {};
+  if (ch.on && ch.orders > 0) {
+    var n = Math.min(ch.orders, monthDeliveredCount()), pct = Math.round(n / ch.orders * 100);
+    html += '<div style="margin:12px 16px 0;padding:14px;border-radius:18px;background:linear-gradient(135deg,#2b1a10,#5e1414);color:#fff;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:12px;font-weight:900;">🏆 تحدي الشهر</div><div style="font-size:10.5px;color:#F5D98A;font-weight:800;">' + n + ' من ' + ch.orders + ' طلبات</div></div>' +
+      '<div style="font-size:10.5px;opacity:.9;margin-top:4px;">' + (n >= ch.orders ? 'مبروك! كسبت ' + ch.points + ' نقطة هدية الشهر ده 🎉' : 'كمّل ' + ch.orders + ' طلبات الشهر ده وخد <b style="color:#F5D98A;">' + ch.points + ' نقطة هدية</b>') + '</div>' +
+      '<div style="height:8px;border-radius:99px;background:rgba(255,255,255,.18);margin-top:8px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:var(--gold);border-radius:99px;transition:width .5s;"></div></div></div>';
+  }
+  var rf = promoSettings.referral || {};
+  if (rf.on && rf.points > 0) {
+    html += '<div style="margin:12px 16px 0;padding:14px;border-radius:18px;background:#fff;border:1.5px dashed var(--gold);display:flex;gap:12px;align-items:center;">' +
+      '<div style="font-size:28px;">🎁</div><div style="flex:1;"><div style="font-size:12px;font-weight:900;color:var(--ink);">هات صاحبك وخد ' + rf.points + ' نقطة</div>' +
+      '<div style="font-size:10.5px;color:#6b5a4a;line-height:1.6;">ابعت الأبليكشن لصاحبك صاحب محل، ولما يكتب رقمك وهو بيسجّل ويطلب أول طلب، انتو الاتنين تاخدوا ' + rf.points + ' نقطة.</div></div>' +
+      '<button onclick="shareReferral()" style="background:#25D366;color:#fff;border-radius:12px;padding:9px 12px;font-size:10.5px;font-weight:900;white-space:nowrap;"><i class="fab fa-whatsapp"></i> ابعت</button></div>';
+  }
+  box.innerHTML = html;
+}
+function shareReferral(){
+  var rf = (promoSettings && promoSettings.referral) || {};
+  var txt = 'نزّل أبليكشن المعلم واطلب بضاعة محلك من موبايلك 🛒\n' + APP_STORE_LINK + '\n\nوانت بتسجّل اكتب رقمي في خانة "رقم صاحبك": ' + customerPhone + '\nوهتاخد ' + (rf.points || '') + ' نقطة هدية مع أول طلب 🎁';
+  var url = 'https://wa.me/?text=' + encodeURIComponent(txt);
+  var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); }, 500);
+}
+function renderBadgeRows(){
+  var setRow = function(headId, rowId, codes){
+    var head = document.getElementById(headId), row = document.getElementById(rowId); if (!head || !row) return;
+    var list = inStockOnly(codes.map(function(c){ return products.find(function(p){ return p.code === c; }); }).filter(Boolean)).slice(0, 12);
+    head.style.display = list.length ? 'flex' : 'none';
+    row.innerHTML = list.map(function(p){ return productCardHtml(p); }).join('');
+  };
+  setRow('newArrivalsHead', 'newArrivalsRow', productBadges.newCodes || []);
+  setRow('backInStockHead', 'backInStockRow', productBadges.backCodes || []);
+}
+function productBadgeOf(code){
+  if ((productBadges.newCodes || []).indexOf(code) !== -1) return 'new';
+  if ((productBadges.backCodes || []).indexOf(code) !== -1) return 'back';
+  return '';
+}
+// نهاية العرض = آخر اليوم المكتوب (مش أوله)
+function offerEndMs(o){
+  if (!o || !o.endDate) return 0;
+  var m = String(o.endDate).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59).getTime() : new Date(o.endDate).getTime();
+}
+function offerIsLive(o){ return o.active !== false && (!o.endDate || offerEndMs(o) >= Date.now()); }
+function offerCountdownText(o){
+  var end = offerEndMs(o); if (!end) return '';
+  var left = end - Date.now(); if (left <= 0 || left > 3 * 86400000) return '';
+  var h = Math.floor(left / 3600000);
+  return h >= 24 ? ('⏳ باقي ' + Math.ceil(left / 86400000) + ' يوم') : (h >= 1 ? ('⏳ باقي ' + h + ' ساعة') : ('⏳ باقي ' + Math.max(1, Math.floor(left / 60000)) + ' دقيقة'));
+}
+
 function productCardHtml(p){
   var stock = getStock(p.code);
   var oos = stock <= 0;
@@ -2807,7 +2911,7 @@ function productCardHtml(p){
   return '<div class="pcard ' + (oos ? 'oos' : '') + '">' +
       '<button class="pcard-fav ' + (isFav ? 'active' : '') + '" onclick="toggleFavorite(&#39;' + p.code + '&#39;)"><i class="fa' + (isFav ? 's' : 'r') + ' fa-star"></i></button>' +
       '<div class="pcard-img-wrap">' + imgHtml +
-      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : (activeOffer ? '<div class="pcard-badge" style="background:var(--maroon);color:#fff;">عرض</div>' : ''))) +
+      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : (activeOffer ? '<div class="pcard-badge" style="background:var(--maroon);color:#fff;">' + (offerCountdownText(activeOffer) || 'عرض') + '</div>' : (productBadgeOf(p.code) === 'new' ? '<div class="pcard-badge" style="background:#1e7a3d;color:#fff;">🆕 جديد</div>' : (productBadgeOf(p.code) === 'back' ? '<div class="pcard-badge" style="background:#2563eb;color:#fff;">✅ رجع</div>' : ''))))) +
       stepperHtml + '</div>' +
       '<div class="pcard-body">' +
       '<div class="pcard-price">' + (activeOffer ? ('<span class="pcard-oldprice">' + money(activeOffer.oldPrice) + ' ج.م</span>') : '') + money(unitPrice) + '<span class="cur">ج.م</span></div>' +
@@ -2896,6 +3000,7 @@ function renderCart(){
   html += suggestionsHtml();
   html += '<div style="height:140px;"></div>' +
       '<div class="cart-footer">' +
+      (belowMin ? '<div style="height:7px;border-radius:99px;background:rgba(0,0,0,.08);overflow:hidden;margin-bottom:6px;"><div style="height:100%;width:' + Math.min(100, Math.round(total / MIN_ORDER_AMOUNT * 100)) + '%;background:linear-gradient(90deg,var(--gold),var(--maroon));border-radius:99px;transition:width .4s;"></div></div>' : '') +
       (belowMin ? '<div style="font-size:10.5px;font-weight:800;color:var(--danger);text-align:center;margin-bottom:8px;">الحد الأدنى للطلب ' + MIN_ORDER_AMOUNT + ' ج.م — ناقصك ' + money(MIN_ORDER_AMOUNT - total) + ' ج.م كمان</div>' :
        (openOrder && total < MIN_ORDER_AMOUNT ? '<div style="font-size:10.5px;font-weight:800;color:var(--maroon);text-align:center;margin-bottom:8px;">' + (repMode ? 'هتتضاف الأصناف دي على طلب العميل المفتوح النهارده رقم #' : 'هتتضاف الأصناف دي لطلبك السابق رقم #') + String(openOrder.id || '').slice(-6) + ' اللي لسه في انتظار التجهيز</div>' : '')) +
       '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:8px;"><span>الإجمالي</span><span style="font-weight:900;">' + money(total) + ' ج.م</span></div>' +
