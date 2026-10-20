@@ -2467,7 +2467,31 @@ function loadLoyaltyPoints(){
 }
 
 function getStock(code){ return stockLevels.hasOwnProperty(code) ? stockLevels[code] : 999; }
-function inStockOnly(list){ return list.filter(function(p){ return getStock(p.code) > 0; }); }
+// (2026-10-20) المتاح بكل وحدة كأرقام صحيحة: الكرتونة = الكراتين الكاملة بس، والعلبة = كل اللي في المخزن بالعلب.
+// لو المتاح أقل من كرتونة، الكرتونة بتتقفل والعميل يطلب بالعلبة بس (مفيش 0.75 كرتونة تاني)
+function stockCapIn(p, unit){
+  var st = Number(getStock(p.code)) || 0;
+  if (unit === 'secondary') return (p.secondaryUnit && p.secondaryUnit.factor) ? Math.floor(st * Number(p.secondaryUnit.factor) + 1e-6) : 0;
+  return Math.floor(st + 1e-6);
+}
+function primaryClosed(p){ return !!(p.secondaryUnit && p.secondaryUnit.factor) && stockCapIn(p, 'primary') < 1 && stockCapIn(p, 'secondary') >= 1; }
+function isSellable(p){ return stockCapIn(p, 'primary') >= 1 || stockCapIn(p, 'secondary') >= 1; }
+function inStockOnly(list){ return list.filter(function(p){ return isSellable(p); }); }
+// بيظبط السلة على المتاح (لو الكرتونة اتقفلت بيحوّلها علب) — بيرجع true لو حاجة اتغيرت
+function sanitizeCart(){
+  var changed = false;
+  Object.keys(cart).forEach(function(code){
+    var e = cart[code], p = products.find(function(x){ return x.code === code; });
+    if (!p || !e) return;
+    var unit = e.unit === 'secondary' && p.secondaryUnit ? 'secondary' : 'primary', qty = Math.floor(Number(e.qty) || 0);
+    if (unit === 'primary' && primaryClosed(p)) { unit = 'secondary'; qty = qty * (Number(p.secondaryUnit.factor) || 1); }
+    qty = Math.min(qty, stockCapIn(p, unit));
+    if (qty <= 0) { delete cart[code]; changed = true; return; }
+    if (qty !== e.qty || unit !== e.unit) { cart[code] = { unit: unit, qty: qty }; changed = true; }
+  });
+  if (changed) { localStorage.setItem('app_cart', JSON.stringify(cart)); scheduleCartSync(); updateCartBadge(); }
+  return changed;
+}
 
 // ===== نظام تتبع الرجوع (زرار الرجوع الفيزيائي في الموبايل) =====
 // الفكرة: كل ما نفتح شاشة فرعية أو مودال، نضيف خطوة في تاريخ المتصفح (history)،
@@ -2875,10 +2899,11 @@ function offerCountdownText(o){
 
 function productCardHtml(p){
   var stock = getStock(p.code);
-  var oos = stock <= 0;
-  var low = !oos && stock <= 5;
+  var oos = !isSellable(p);
+  var closed = !oos && primaryClosed(p);
+  var low = !oos && !closed && stock <= 5;
   var entry = cart[p.code];
-  var isSecondary = entry && entry.unit === 'secondary';
+  var isSecondary = (entry && entry.unit === 'secondary') || (!entry && closed);
   var unitLabel = isSecondary ? (p.secondaryUnit ? p.secondaryUnit.name : p.unit) : p.unit;
   var unitPrice = getUnitPrice(p, isSecondary ? 'secondary' : 'primary');
   var activeOffer = !isSecondary ? getActiveOffer(p.code) : null;
@@ -2893,7 +2918,7 @@ function productCardHtml(p){
 
   var stepperHtml;
   if (!entry || !entry.qty){
-    stepperHtml = '<button class="pcard-add" ' + (oos ? 'disabled' : '') + ' onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,1)"><i class="fas fa-plus"></i></button>';
+    stepperHtml = '<button class="pcard-add" ' + (oos ? 'disabled' : '') + ' onclick="addToCart(&#39;' + p.code + '&#39;,&#39;' + (closed ? 'secondary' : 'primary') + '&#39;,1)"><i class="fas fa-plus"></i></button>';
   } else {
     stepperHtml = '<div class="pcard-stepper">' +
         '<button onclick="addToCart(&#39;' + p.code + '&#39;,&#39;' + entry.unit + '&#39;,' + (entry.qty - 1) + ')"><i class="fas fa-minus"></i></button>' +
@@ -2904,14 +2929,14 @@ function productCardHtml(p){
   var unitsHtml = '';
   if (p.secondaryUnit){
     unitsHtml = '<div class="pcard-units">' +
-        '<button class="pcard-unit-btn ' + (!isSecondary ? 'active' : '') + '" onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry && !isSecondary ? entry.qty : 1) + ')">' + p.unit + '</button>' +
+        '<button class="pcard-unit-btn ' + (!isSecondary ? 'active' : '') + '" ' + (closed ? 'disabled style="opacity:.35;text-decoration:line-through;"' : '') + ' onclick="addToCart(&#39;' + p.code + '&#39;,&#39;primary&#39;,' + (entry && !isSecondary ? entry.qty : 1) + ')">' + p.unit + '</button>' +
         '<button class="pcard-unit-btn ' + (isSecondary ? 'active' : '') + '" onclick="addToCart(&#39;' + p.code + '&#39;,&#39;secondary&#39;,' + (entry && isSecondary ? entry.qty : 1) + ')">' + p.secondaryUnit.name + '</button></div>';
   }
 
   return '<div class="pcard ' + (oos ? 'oos' : '') + '">' +
       '<button class="pcard-fav ' + (isFav ? 'active' : '') + '" onclick="toggleFavorite(&#39;' + p.code + '&#39;)"><i class="fa' + (isFav ? 's' : 'r') + ' fa-star"></i></button>' +
       '<div class="pcard-img-wrap">' + imgHtml +
-      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : (activeOffer ? '<div class="pcard-badge" style="background:var(--maroon);color:#fff;">' + (offerCountdownText(activeOffer) || 'عرض') + '</div>' : (productBadgeOf(p.code) === 'new' ? '<div class="pcard-badge" style="background:#1e7a3d;color:#fff;">🆕 جديد</div>' : (productBadgeOf(p.code) === 'back' ? '<div class="pcard-badge" style="background:#2563eb;color:#fff;">✅ رجع</div>' : ''))))) +
+      (oos ? '<div class="pcard-badge oos">غير متوفر</div>' : closed ? '<div class="pcard-badge low">متاح ' + stockCapIn(p, 'secondary') + ' ' + p.secondaryUnit.name + ' بس</div>' : (low ? '<div class="pcard-badge low">كمية محدودة</div>' : (activeOffer ? '<div class="pcard-badge" style="background:var(--maroon);color:#fff;">' + (offerCountdownText(activeOffer) || 'عرض') + '</div>' : (productBadgeOf(p.code) === 'new' ? '<div class="pcard-badge" style="background:#1e7a3d;color:#fff;">🆕 جديد</div>' : (productBadgeOf(p.code) === 'back' ? '<div class="pcard-badge" style="background:#2563eb;color:#fff;">✅ رجع</div>' : ''))))) +
       stepperHtml + '</div>' +
       '<div class="pcard-body">' +
       '<div class="pcard-price">' + (activeOffer ? ('<span class="pcard-oldprice">' + money(activeOffer.oldPrice) + ' ج.م</span>') : '') + money(unitPrice) + '<span class="cur">ج.م</span></div>' +
@@ -2923,11 +2948,17 @@ function addToCart(code, unit, qty){
   if (isGuest && !repMode) { promptGuestLogin(); return; }
   var p = products.find(function(x){return x.code === code;});
   if (!p) return;
-  var stock = getStock(code);
-  if (qty > 0 && stock <= 0) { showToast('الكمية المتاحة من هذا الصنف خلصت', 'error'); return; }
+  if (qty > 0 && !isSellable(p)) { showToast('الكمية المتاحة من هذا الصنف خلصت', 'error'); return; }
+  // (2026-10-20) المتاح أقل من كرتونة: الكرتونة مقفولة، والطلب بيتحول للعلبة على طول
+  if (unit !== 'secondary' && qty > 0 && primaryClosed(p)) {
+    unit = 'secondary';
+    var curSec = cart[code] && cart[code].unit === 'secondary' ? cart[code].qty : 0;
+    qty = Math.max(1, curSec || 1);
+    showToast('المتاح أقل من ' + p.unit + ' — اطلب بال' + p.secondaryUnit.name + ' (متاح ' + stockCapIn(p, 'secondary') + ' ' + p.secondaryUnit.name + ')');
+  }
   var maxUnit = unit === 'secondary' ? (p.maxOrderQty || 99) * (p.secondaryUnit ? p.secondaryUnit.factor || 1 : 1) : (p.maxOrderQty || 99);
-  // الحد الأقصى المسموح بيه من نفس الوحدة دي حسب المتاح فعليًا بالمخزن (بالكرتونة)
-  var stockCapInUnit = (unit === 'secondary' && p.secondaryUnit && p.secondaryUnit.factor) ? Math.floor(stock * p.secondaryUnit.factor) : stock;
+  // الحد الأقصى المسموح بيه من نفس الوحدة دي حسب المتاح فعليًا بالمخزن (أرقام صحيحة بس)
+  var stockCapInUnit = stockCapIn(p, unit);
   var requestedQty = qty;
   qty = Math.max(0, Math.min(qty, maxUnit));
   if (qty > stockCapInUnit) {
@@ -3081,7 +3112,7 @@ function getUsualForgottenProducts(){
   return Object.keys(counts).filter(function(c){ return counts[c] >= 2 && !cart[c]; })
     .sort(function(a, b){ return counts[b] - counts[a]; })
     .map(function(c){ return products.find(function(p){ return p.code === c; }); })
-    .filter(function(p){ return p && getStock(p.code) > 0; }).slice(0, 8);
+    .filter(function(p){ return p && isSellable(p); }).slice(0, 8);
 }
 function getBoughtTogetherProducts(){
   if (!suggestionPairs) return [];
@@ -3094,7 +3125,7 @@ function getBoughtTogetherProducts(){
   });
   return Object.keys(score).sort(function(a, b){ return score[b] - score[a]; })
     .map(function(c){ return products.find(function(p){ return p.code === c; }); })
-    .filter(function(p){ return p && getStock(p.code) > 0; }).slice(0, 8);
+    .filter(function(p){ return p && isSellable(p); }).slice(0, 8);
 }
 function suggestionsHtml(){
   loadSuggestionPairs();
@@ -3113,9 +3144,10 @@ function applyLastOrder(){
   if (!lastOrderItems || Object.keys(lastOrderItems).length === 0){ showToast('لا يوجد طلب سابق'); return; }
   cart = JSON.parse(JSON.stringify(lastOrderItems));
   localStorage.setItem('app_cart', JSON.stringify(cart));
+  var adj = sanitizeCart();
   scheduleCartSync();
   updateCartBadge();
-  showToast('تم استرجاع آخر طلب');
+  showToast(adj ? 'تم استرجاع آخر طلب — وفيه أصناف اتظبطت على المتاح دلوقتي' : 'تم استرجاع آخر طلب');
   switchScreen('cart');
 }
 
@@ -3267,6 +3299,7 @@ function findOpenSameDayOrder(code){
 }
 
 function sendOrderToServer(){
+  if (sanitizeCart()) { showToast('فيه أصناف اتظبطت على المتاح في المخزن — راجع السلة وابعت تاني', 'error'); switchScreen('cart'); return; }
   var lines = getCartLineItems();
   if (lines.length === 0) return;
   if (!db) { showToast('لا يوجد اتصال بالإنترنت حاليًا، حاول تاني', 'error'); return; }
