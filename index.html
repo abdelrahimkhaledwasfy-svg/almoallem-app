@@ -434,6 +434,7 @@
   </div>
 
   <div id="repHomeScreen" class="screen">
+    <div id="repDiagBox" style="display:none;margin:12px 16px 0;padding:12px;border-radius:14px;background:#fde8e8;color:#8a1c1c;font-size:11px;line-height:1.8;font-weight:700;"></div>
     <div class="welcome-card">
       <div class="welcome-row">
         <div class="avatar-badge">م</div>
@@ -1252,8 +1253,20 @@ function listenCustomers(){
       setStorage('customers', allCustomers);
       if (repMode) refreshRepScreensIfNeeded();
       else { try { loadLoyaltyPoints(); } catch (e) {} }
-    }, function(err){ console.error('Customers listener error:', err); });
+    }, function(err){
+      console.error('Customers listener error:', err);
+      // (2026-10-23) لو العملاء ماتحملوش: رسالة واضحة فيها السبب، ومحاولة تانية لوحدها بعد شوية
+      showRepDiag('مقدرتش أحمّل عملاءك (' + ((err && err.code) || 'خطأ') + ').');
+      if (repMode && !window._custRetryT) window._custRetryT = setTimeout(function(){ window._custRetryT = null; customersListenerStarted = false; listenCustomers(); }, 20000);
+    });
   }); });
+}
+function showRepDiag(msg){
+  var b = document.getElementById('repDiagBox'); if (!b) return;
+  var u = null; try { u = firebase.auth && firebase.auth().currentUser; } catch (e) {}
+  b.innerHTML = '⚠️ ' + msg + '<br>كود المندوب: ' + (currentRep ? currentRep.code : '-') + ' · نسخة الدخول: ' + ((currentRep && currentRep.authV) || 'قديمة') + ' · حساب الحماية: ' + (u ? u.email : 'مش داخل') +
+    '<br>صوّر الرسالة دي وابعتها للإدارة. <button onclick="repLogout()" style="background:#8a1c1c;color:#fff;border-radius:8px;padding:3px 10px;font-size:10.5px;">خروج ودخول تاني</button>';
+  b.style.display = '';
 }
 
 // أرصدة المخزون الحية (نفس المجموعة اللي نظام المعلم بيرفعلها، ونفس المجموعة اللي بيتعمل عليها
