@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{--maroon:#7A1F1F;--maroon-dark:#5E1414;--gold:#D4A017;--cream:#FBF3E7;--sand:#F3E4CB;--card:#FFFDF9;--border:#F0E4CE;--ink:#3B2417;--muted:#8a7460;--danger:#B23A2E;--success:#2E7D42;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -1362,7 +1363,26 @@ async function doRepLoginSubmit(){
     // المندوب يدخل بيوزر الدخول أو برقم تليفونه (الاتنين شغالين)
     var normPhone = function(v){ return normDigits(v).replace(/[^0-9]/g, '').replace(/^20(?=1)/, '0'); };
     var isMe = function(s){ return (s.repUsername && normUser(s.repUsername) === normUser(username)) || (s.phone && normPhone(s.phone) && normPhone(s.phone) === normPhone(username)); };
-    var rep = salesmenList.find(function(s){ return s.repPasswordHash && isMe(s) && hashes.indexOf(s.repPasswordHash) !== -1; });
+    var rep = null, authV = null;
+    // (2026-10-23) الدخول الآمن: بنلاقي كود المندوب من بصمة اليوزر/التليفون، وFirebase هو اللي بيتأكد من الباسورد
+    try {
+      mark('بيدوّر على الحساب');
+      var lm = await db.collection('appMeta').doc('repLogin').get();
+      var keys = (lm.exists && lm.data().keys) || {};
+      var e1 = keys[await hashPassword('u:' + normUser(username))] || (normPhone(username).length >= 10 ? keys[await hashPassword('p:' + normPhone(username))] : null);
+      if (e1) {
+        var me1 = salesmenList.find(function(s){ return String(s.code) === String(e1.c); });
+        if (me1 && me1.repAuthV && String(me1.repAuthV) === String(e1.v)) {
+          var em = 'rep-' + (String(e1.c).toLowerCase().replace(/[^a-z0-9]/g, '') || 'x') + '-v' + e1.v + '@almoallem-rep.local';
+          try {
+            await firebase.auth().signInWithEmailAndPassword(em, normDigits(password).trim() + '#almoallem-rep-2026');
+            rep = me1; authV = e1.v;
+          } catch (ae) { if (!(ae && /wrong-password|invalid-credential|invalid-login|user-not-found|too-many/.test(ae.code || ''))) throw ae; if (ae && /too-many/.test(ae.code || '')) { showLoading(false); setBtn('دخول'); window._loginInProgress = false; showToast('محاولات كتير غلط — استنى شوية وجرب تاني', 'error'); return; } }
+        }
+      }
+    } catch (se) { console.error('secure rep login', se); if (se && se.code && !/permission|unavailable/.test(se.code)) throw se; }
+    // الطريقة القديمة (للمناديب اللي لسه ما اتأمّنوش بس)
+    if (!rep) rep = salesmenList.find(function(s){ return !s.repAuthV && s.repPasswordHash && isMe(s) && hashes.indexOf(s.repPasswordHash) !== -1; });
     setBtn('دخول');
     if (!rep) {
       var sameUser = salesmenList.find(function(s){ return isMe(s); });
@@ -1378,6 +1398,7 @@ async function doRepLoginSubmit(){
     repMode = true;
     allSalesmen = salesmenList; setStorage('salesmen', salesmenList);
     currentRep = { code: rep.code, name: rep.name, type: rep.repType === 'delivery' ? 'delivery' : 'sales' };
+    if (authV) currentRep.authV = authV;
     localStorage.setItem('app_rep_mode', '1');
     localStorage.setItem('app_current_rep', JSON.stringify(currentRep));
     isGuest = true; // وضع المندوب مش مرتبط بحساب عميل، فبنعامله كوضع تصفح مفتوح بدون حساب عميل
@@ -1400,7 +1421,11 @@ async function doRepLoginSubmit(){
 function checkRepStillActive(){
   if (!repMode || !currentRep || !Array.isArray(allSalesmen) || !allSalesmen.length) return;
   var me = allSalesmen.find(function(s){ return String(s.code) === String(currentRep.code); });
-  var why = !me ? 'حسابك كمندوب اتشال من السيستم' : (!me.repPasswordHash ? 'كلمة السر بتاعتك اتلغت من السيستم' : ((me.status && me.status !== 'نشط') ? 'حسابك كمندوب اتوقف من السيستم' : ''));
+  // (2026-10-23) الدخول الآمن: لو المدير غيّر كلمة السر (أو أمّن الحساب) رقم النسخة بيتغير، فالمندوب يدخل تاني
+  var secured = !!me && !!me.repAuthV;
+  var why = !me ? 'حسابك كمندوب اتشال من السيستم'
+    : (secured ? (String(me.repAuthV) !== String(currentRep.authV || '') ? 'كلمة السر بتاعتك اتغيرت من الإدارة، ادخل تاني بالجديدة' : '') : (!me.repPasswordHash ? 'كلمة السر بتاعتك اتلغت من السيستم' : ''))
+      || ((me.status && me.status !== 'نشط') ? 'حسابك كمندوب اتوقف من السيستم' : '');
   if (!why) {
     var t = me.repType === 'delivery' ? 'delivery' : 'sales';
     if (t !== currentRep.type) { why = 'نوع حسابك اتغير من السيستم، ادخل تاني'; }
@@ -1416,6 +1441,7 @@ function repLogout(){
   // الموبايل يبطل يستقبل إشعارات المندوب بعد الخروج
   if (window.AlmoallemAndroid) { try { AlmoallemAndroid.logout(); } catch (e) {} }
   else { try { window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); }); } catch (e) {} }
+  try { if (firebase.auth) firebase.auth().signOut().catch(function(){}); } catch (e) {}
   repMode = false;
   currentRep = null;
   repTargetCustomer = null;
