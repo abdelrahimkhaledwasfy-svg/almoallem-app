@@ -1136,6 +1136,46 @@ function customerIsMine(c){
   var me = digitsOnly(customerPhone).slice(-10);
   return String(c.code) === String(customerPhone) || (me && digitsOnly(c.phone).slice(-10) === me);
 }
+// (2026-10-23) المندوب المأمّن بيدخل بحساب Firebase؛ بعد فتح الأبليكشن تاني الجلسة بترجع لوحدها بعد لحظة،
+// فبنستناها قبل ما نقرا أي حاجة مقفولة للمناديب (العملاء، التارجت، العجز)
+var _repAuthPromise = null;
+function whenRepAuthReady(){
+  if (_repAuthPromise) return _repAuthPromise;
+  _repAuthPromise = new Promise(function(resolve){
+    if (!(firebase.auth && repMode && currentRep && currentRep.authV)) { resolve(null); return; }
+    var done = false, finish = function(u){ if (done) return; done = true; resolve(u || null); };
+    try { var un = firebase.auth().onAuthStateChanged(function(u){ if (u) { finish(u); try { un(); } catch (e) {} } }); } catch (e) { finish(null); }
+    setTimeout(function(){ finish(firebase.auth().currentUser); }, 8000);
+  }).then(function(u){
+    if (!u && repMode && currentRep && currentRep.authV && !window._repKickShown) { window._repKickShown = true; alert('محتاج تسجّل دخول تاني كمندوب'); repLogout(); }
+    return u;
+  });
+  return _repAuthPromise;
+}
+// العميل: ملفه بس من customerPublic (مش من قايمة العملاء)
+function listenMyCustomerPublic(){
+  var l = digitsOnly(customerPhone).slice(-10);
+  customersListenerStarted = true;
+  var fellBack = false;
+  // لحد ما الملف الصغير يتعمل (أو قبل تحديث قواعد الحماية)، بنقرا بالطريقة القديمة
+  var fallback = function(){
+    if (fellBack) return; fellBack = true;
+    var vars = myPhoneVariants(customerPhone);
+    Promise.all([db.collection('customerRecords').where('code', 'in', vars).get(), db.collection('customerRecords').where('phone', 'in', vars).get()]).then(function(r){
+      var byCode = {}; r.forEach(function(sn){ sn.docs.forEach(function(d){ var c = d.data(); byCode[String(c.code)] = c; }); });
+      allCustomers = Object.keys(byCode).map(function(k){ return byCode[k]; });
+      setStorage('customers', allCustomers);
+      try { loadLoyaltyPoints(); } catch (e) {}
+    }).catch(function(e){ console.warn('customer fallback failed', e); });
+  };
+  if (l.length !== 10) { fallback(); return; }
+  db.collection('customerPublic').doc(l).onSnapshot(function(snap){
+    if (!snap.exists) { fallback(); return; }
+    allCustomers = snap.data().list || [];
+    setStorage('customers', allCustomers);
+    try { loadLoyaltyPoints(); } catch (e) {}
+  }, function(err){ console.warn('my customer listener error:', err); fallback(); });
+}
 function listenCustomers(){
   if (customersListenerStarted || !db) return;
   var queries = [];
@@ -1146,17 +1186,17 @@ function listenCustomers(){
     queries.push(db.collection('customerRecords').where('salesmanCode', 'in', codes));
     allCustomers = allCustomers.filter(function(c){ return String(c.salesmanCode || '') === code; });
   } else if (!isGuest && customerPhone) {
-    var vars = myPhoneVariants(customerPhone);
-    queries.push(db.collection('customerRecords').where('code', 'in', vars));
-    queries.push(db.collection('customerRecords').where('phone', 'in', vars));
     allCustomers = allCustomers.filter(customerIsMine);
+    setStorage('customers', allCustomers);
+    listenMyCustomerPublic();
+    return;
   } else {
     allCustomers = []; setStorage('customers', []); return;
   }
   setStorage('customers', allCustomers);   // بنمسح أي نسخة كاملة قديمة متخزنة على الموبايل
   customersListenerStarted = true;
   var parts = queries.map(function(){ return null; });
-  queries.forEach(function(q, idx){
+  whenRepAuthReady().then(function(){ queries.forEach(function(q, idx){
     q.onSnapshot(function(snap){
       parts[idx] = snap.docs.map(function(d){ return d.data(); });
       if (parts.some(function(p){ return p === null; })) return;
@@ -1167,7 +1207,7 @@ function listenCustomers(){
       if (repMode) refreshRepScreensIfNeeded();
       else { try { loadLoyaltyPoints(); } catch (e) {} }
     }, function(err){ console.error('Customers listener error:', err); });
-  });
+  }); });
 }
 
 // أرصدة المخزون الحية (نفس المجموعة اللي نظام المعلم بيرفعلها، ونفس المجموعة اللي بيتعمل عليها
@@ -1609,7 +1649,7 @@ function flushPendingVisits(){
 function startRepVisitsListener(){
   if (!db || repVisitsListenerStarted || !currentRep || currentRep.type !== 'sales') return;
   repVisitsListenerStarted = true;
-  db.collection('customerVisitRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('customerVisitRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
     var cloud = snap.docs.map(function(d){ return d.data(); });
     var ids = {}; cloud.forEach(function(v){ ids[String(v.id)] = true; });
     // أول مرة: أي زيارة قديمة على الموبايل ومش موجودة على السحابة بنرفعها (ممكن تكون ضاعت قبل الإصلاح ده)
@@ -1620,7 +1660,7 @@ function startRepVisitsListener(){
     saveRepVisitsLocal();
     flushPendingVisits();
     refreshRepScreensIfNeeded();
-  }, function(err){ console.error('rep visits listener error:', err); });
+  }, function(err){ console.error('rep visits listener error:', err); }); });
   setInterval(flushPendingVisits, 60000);
   window.addEventListener('online', flushPendingVisits);
 }
@@ -1719,10 +1759,10 @@ var repProgressDoc = null, repProgressListenerStarted = false;
 function startRepProgressListener(){
   if (!db || repProgressListenerStarted || !currentRep || currentRep.type !== 'sales') return;
   repProgressListenerStarted = true;
-  db.collection('meta').doc('repProgress').onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('meta').doc('repProgress').onSnapshot(function(snap){
     repProgressDoc = snap.exists ? (snap.data() || {}) : null;
     renderRepProgress();
-  }, function(err){ console.error('rep progress listener error:', err); });
+  }, function(err){ console.error('rep progress listener error:', err); }); });
 }
 function repMonthKey(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function renderRepProgress(){
@@ -1832,10 +1872,10 @@ let deliveryHistoryListenerStarted = false;
 function startDeliveryHistoryListener(){
   if (!db || deliveryHistoryListenerStarted || !currentRep) return;
   deliveryHistoryListenerStarted = true;
-  db.collection('deliveryCollectionRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('deliveryCollectionRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
     deliveryHistoryInvoices = snap.docs.map(function(d){ return d.data(); });
     renderDeliveryHome();
-  }, function(err){ console.error('Delivery history listener error:', err); });
+  }, function(err){ console.error('Delivery history listener error:', err); }); });
 }
 
 // (2026-10-08) المبلغ المطلوب بيتحسب من أصناف الطلب نفسها (نفس طريقة نظام المعلم وقت عمل الفاتورة)
@@ -1864,12 +1904,12 @@ var repShortageListenerStarted = false;
 function startRepShortageListener(){
   if (!db || repShortageListenerStarted || !currentRep) return;
   repShortageListenerStarted = true;
-  db.collection('meta').doc('repShortages').onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('meta').doc('repShortages').onSnapshot(function(snap){
     var d = snap.exists ? (snap.data() || {}) : {};
     var b = d.initializedAt && d.balances ? d.balances[String(currentRep.code)] : null;
     myShortageBalance = b && b.balance != null ? (Number(b.balance) || 0) : null;
     renderDeliveryHome();
-  }, function(err){ console.error('rep shortage listener error:', err); });
+  }, function(err){ console.error('rep shortage listener error:', err); }); });
 }
 function myShortageHtml(){
   if (myShortageBalance == null || Math.abs(myShortageBalance) < 0.005) return '';
@@ -2221,9 +2261,15 @@ async function findSystemCustomerByPhoneCloud(raw){
   var local = findSystemCustomerByPhone(raw); if (local) return local;
   if (!db) return null;
   try {
-    var vars = phoneIdVariants(raw).slice(0, 10);
-    var snaps = await Promise.all([db.collection('customerRecords').where('phone', 'in', vars).limit(1).get(), db.collection('customerRecords').where('code', 'in', vars).limit(1).get()]);
-    for (var i = 0; i < snaps.length; i++) if (!snaps[i].empty) return snaps[i].docs[0].data();
+    var l10 = digitsOnly(raw).slice(-10);
+    if (l10.length === 10) {
+      try { var ps = await db.collection('customerPublic').doc(l10).get(); if (ps.exists && (ps.data().list || []).length) return ps.data().list[0]; } catch (pe) {}
+      try {
+        var vars = phoneIdVariants(raw).slice(0, 10);
+        var snaps = await Promise.all([db.collection('customerRecords').where('phone', 'in', vars).limit(1).get(), db.collection('customerRecords').where('code', 'in', vars).limit(1).get()]);
+        for (var i = 0; i < snaps.length; i++) if (!snaps[i].empty) return snaps[i].docs[0].data();
+      } catch (fe) {}
+    }
   } catch (e) { console.warn('system customer lookup failed', e); }
   return null;
 }
