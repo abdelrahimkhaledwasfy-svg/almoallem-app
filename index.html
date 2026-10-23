@@ -320,14 +320,14 @@
       <div class="field">
         <label>يوزر المندوب</label>
         <div class="input-wrap">
-          <input type="text" id="repLoginUsername" placeholder="اليوزر أو رقم تليفونك..." dir="ltr" style="text-align:left;">
+          <input type="text" id="repLoginUsername" placeholder="اليوزر أو رقم تليفونك..." dir="ltr" style="text-align:left;" autocomplete="off" autocapitalize="off" spellcheck="false">
           <i class="fas fa-user"></i>
         </div>
       </div>
       <div class="field">
         <label>كلمة السر</label>
         <div class="input-wrap">
-          <input type="password" id="repLoginPassword" placeholder="ادخل كلمة السر" dir="ltr" style="text-align:left;">
+          <input type="password" id="repLoginPassword" placeholder="ادخل كلمة السر" dir="ltr" style="text-align:left;" autocomplete="off">
           <i class="fas fa-lock"></i>
           <i class="fas fa-eye toggle-eye" onclick="togglePwVisibility('repLoginPassword', this)"></i>
         </div>
@@ -1039,7 +1039,8 @@ const MIN_ORDER_AMOUNT = 1000;
 
 // ==================== وضع مندوب (زيارات + طلب نيابة عن تاجر) ====================
 let allCustomers = getStorage('customers', []); // كل عملاء المعلم - يستخدمها المندوب للاختيار منها
-let allSalesmen  = getStorage('salesmen', []);  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
+let allSalesmen  = localStorage.getItem('app_rep_mode') === '1' ? getStorage('salesmen', []) : [];
+if (localStorage.getItem('app_rep_mode') !== '1') { try { localStorage.removeItem('salesmen'); } catch (e) {} }  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
 let repMode = localStorage.getItem('app_rep_mode') === '1';
 let currentRep = JSON.parse(localStorage.getItem('app_current_rep') || 'null');
 let repTargetCustomer = null; // العميل المختار حاليًا عشان المندوب يزوره/يطلب له
@@ -1213,7 +1214,8 @@ function applyStoreData(data){
   requireActivationCode = !!data.requireActivationCode;
   activationCodes = data.activationCodes || [];
   // بيانات "وضع مندوب": قايمة المناديب (لفحص بيانات الدخول) - العملاء بقوا ليهم Listener مستقل (listenCustomers)
-  allSalesmen  = data.salesmen || [];
+  // (2026-10-23) بيانات المناديب بتتحفظ على موبايل المندوب بس — موبايل العميل مبيحتفظش بيها خالص
+  allSalesmen  = repMode ? (data.salesmen || []) : [];
   deliveryZoneMap = data.neighborhoodZoneMap || {};
   setStorage('neighborhoodZoneMap', deliveryZoneMap);
   checkRepStillActive();
@@ -1229,7 +1231,7 @@ function applyStoreData(data){
   setStorage('appBrands', data.appBrands || []);
   setStorage('appBanners', data.appBanners || []);
   setStorage('appOffers', data.appOffers || []);
-  setStorage('salesmen', data.salesmen || []);
+  setStorage('salesmen', repMode ? (data.salesmen || []) : []);
   setStorage('appNeighborhoods', data.appNeighborhoods || []);
   localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
   localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
@@ -1265,7 +1267,7 @@ function loadStoreDataFromLocalCache(){
   activationCodes = getStorage('activationCodes', []);
   appNeighborhoods = getStorage('appNeighborhoods', []);
   allCustomers = getStorage('customers', []);
-  allSalesmen  = getStorage('salesmen', []);
+  allSalesmen  = repMode ? getStorage('salesmen', []) : [];
   populateRegDropdowns();
 }
 
@@ -1346,7 +1348,7 @@ async function doRepLoginSubmit(){
       new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('TIMEOUT')); }, 12000); })
     ]);
     var data = docSnap.exists ? docSnap.data() : {};
-    mark('وصلت بيانات المناديب (' + ((data.salesmen || []).length) + ' مندوب)');
+    mark('وصلت البيانات');
     var salesmenList = data.salesmen || [];
     // الأرقام العربي (١٢٣) زي الإنجليزي، ومن غير فرق حروف كبيرة/صغيرة أو مسافات زيادة
     var normDigits = function(v){ return String(v || '').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }); };
@@ -1366,14 +1368,15 @@ async function doRepLoginSubmit(){
       var sameUser = salesmenList.find(function(s){ return isMe(s); });
       showLoading(false);
       window._loginInProgress = false; try { localStorage.removeItem('rep_login_trace'); } catch (e) {}
-      if (!sameUser) { alert('مفيش مندوب باليوزر أو رقم التليفون "' + username + '".\nاتأكد منه من شاشة "قاعدة المناديب" في السيستم.\n(موجود ' + salesmenList.filter(function(s){ return s.repUsername; }).length + ' مندوب ليهم يوزر)'); return; }
-      if (!sameUser.repPasswordHash) { alert('المندوب ده مالوش كلمة سر لسه. اكتبله كلمة سر من السيستم.'); return; }
-      alert('كلمة السر غلط'); return;
+      // (2026-10-23) رسالة واحدة عامة: الأبليكشن بيتفتح للعملاء، فمنقولش موجود كام مندوب ولا إن اليوزر ده موجود ولا لأ
+      void sameUser;
+      showToast('اليوزر أو كلمة السر غلط — لو نسيتهم كلم الإدارة', 'error'); return;
     }
     showLoading(false);
     if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
     if (rep.status && rep.status !== 'نشط') { showToast('حساب المندوب موقوف حاليًا', 'error'); return; }
     repMode = true;
+    allSalesmen = salesmenList; setStorage('salesmen', salesmenList);
     currentRep = { code: rep.code, name: rep.name, type: rep.repType === 'delivery' ? 'delivery' : 'sales' };
     localStorage.setItem('app_rep_mode', '1');
     localStorage.setItem('app_current_rep', JSON.stringify(currentRep));
