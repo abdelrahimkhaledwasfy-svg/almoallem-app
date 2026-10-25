@@ -1006,12 +1006,22 @@ function initOneSignalForRep(){
   });
 }
 
+// (2026-10-25) الأبليكشن والسيستم على نفس الموقع (github.io) فبيشاركوا نفس التخزين على الجهاز لو اتفتحوا من نفس المتصفح.
+// عشان محدش يكتب فوق التاني (زي "customers" و"products")، كل مفاتيح الأبليكشن بقت بادئة am_
+function amKey(key){ return 'am_' + key; }
+// تنضيف مرة واحدة: النسخ القديمة من غير بادئة — بس لو السيستم مش مفتوح على نفس المتصفح (عشان منمسحش حاجته)
+(function(){ try {
+  if (localStorage.getItem('am_cleaned_v1')) return;
+  var sysHere = localStorage.getItem('_lastSyncedCustomers') != null || localStorage.getItem('_lastSynced') != null || localStorage.getItem('currentUser') != null;
+  if (!sysHere) ['products','customers','customerOrders','appBanners','appBrands','appCategories','appNeighborhoods','appOffers','neighborhoodZoneMap','inventory_stockLevels','salesmen','activationCodes','loyaltySettings','requireActivationCode'].forEach(function(k){ localStorage.removeItem(k); });
+  localStorage.setItem('am_cleaned_v1', '1');
+} catch (e) {} })();
 function getStorage(key, fallback){
-  try { var d = localStorage.getItem(key); return d ? JSON.parse(d) : fallback; }
+  try { var d = localStorage.getItem(amKey(key)); return d ? JSON.parse(d) : fallback; }
   catch(e){ return fallback; }
 }
 function setStorage(key, val){
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){}
+  try { localStorage.setItem(amKey(key), JSON.stringify(val)); } catch(e){}
 }
 
 // قوائم المدن والأحياء بمحافظة أسوان — قابلة للتعديل بسهولة، لو محتاج تضيف/تغيّر أي اسم قولّي
@@ -1075,10 +1085,10 @@ let myOrders = [];
 let activeCatId = null, activeBrandName = null;
 let adIndex = 0, adTimer = null, subAdIndex = 0, subAdTimer = null;
 let deliveryTime = 'morning';
-let loyaltySettings = JSON.parse(localStorage.getItem('loyaltySettings') || 'null') || { pointsPerAmount: 10, pointValue: 1 };
+let loyaltySettings = JSON.parse(localStorage.getItem(amKey('loyaltySettings')) || 'null') || { pointsPerAmount: 10, pointValue: 1 };
 let redeemPointsChecked = false;
-let requireActivationCode = JSON.parse(localStorage.getItem('requireActivationCode') || 'false');
-let activationCodes = JSON.parse(localStorage.getItem('activationCodes') || '[]');
+let requireActivationCode = JSON.parse(localStorage.getItem(amKey('requireActivationCode')) || 'false');
+let activationCodes = JSON.parse(localStorage.getItem(amKey('activationCodes')) || '[]');
 let currentRatingOrderId = null, currentRatingStars = 5;
 let regLocationCoords = null;
 let isGuest = localStorage.getItem('app_guest_mode') === '1';
@@ -1088,7 +1098,7 @@ const MIN_ORDER_AMOUNT = 1000;
 // ==================== وضع مندوب (زيارات + طلب نيابة عن تاجر) ====================
 let allCustomers = getStorage('customers', []); // كل عملاء المعلم - يستخدمها المندوب للاختيار منها
 let allSalesmen  = localStorage.getItem('app_rep_mode') === '1' ? getStorage('salesmen', []) : [];
-if (localStorage.getItem('app_rep_mode') !== '1') { try { localStorage.removeItem('salesmen'); } catch (e) {} }  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
+if (localStorage.getItem('app_rep_mode') !== '1') { try { localStorage.removeItem(amKey('salesmen')); } catch (e) {} }  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
 let repMode = localStorage.getItem('app_rep_mode') === '1';
 let currentRep = JSON.parse(localStorage.getItem('app_current_rep') || 'null');
 let repTargetCustomer = null; // العميل المختار حاليًا عشان المندوب يزوره/يطلب له
@@ -1333,9 +1343,9 @@ function applyStoreData(data){
   setStorage('appOffers', data.appOffers || []);
   setStorage('salesmen', repMode ? (data.salesmen || []) : []);
   setStorage('appNeighborhoods', data.appNeighborhoods || []);
-  localStorage.setItem('loyaltySettings', JSON.stringify(loyaltySettings));
-  localStorage.setItem('requireActivationCode', JSON.stringify(requireActivationCode));
-  localStorage.setItem('activationCodes', JSON.stringify(activationCodes));
+  localStorage.setItem(amKey('loyaltySettings'), JSON.stringify(loyaltySettings));
+  localStorage.setItem(amKey('requireActivationCode'), JSON.stringify(requireActivationCode));
+  localStorage.setItem(amKey('activationCodes'), JSON.stringify(activationCodes));
   loadLoyaltyPoints();
   populateRegDropdowns();
 }
