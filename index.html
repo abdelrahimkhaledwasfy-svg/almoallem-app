@@ -66,6 +66,8 @@
   .section-bar{width:4px;height:16px;border-radius:2px;background:var(--maroon);}
   .section-title{font-size:13px;font-weight:800;}
   .ad-banner{margin:14px 16px 0;border-radius:20px;padding:18px 20px;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;color:var(--cream);box-shadow:0 8px 24px rgba(122,31,31,0.35);border:1px solid rgba(255,255,255,0.15);animation:adFadeIn .5s ease;}
+  /* (2026-10-26) بانر بصورة: الصندوق بنفس نسبة الصورة بالظبط (1200×500 = 12:5) على أي موبايل، من غير فراغات ولا دواير فوقها */
+  .ad-banner.has-img::before,.ad-banner.has-img::after,.ad-banner-sub.has-img::after{display:none;}
   .ad-banner::before{content:'';position:absolute;left:-20px;bottom:-30px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,0.14);}
   .ad-banner::after{content:'';position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.08);}
   .ad-badge{position:relative;align-self:flex-start;background:rgba(255,255,255,0.22);backdrop-filter:blur(2px);color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;margin-bottom:8px;display:flex;align-items:center;gap:4px;}
@@ -2795,13 +2797,13 @@ function drawAdBanner(mainBanners){
   // لو البانر عنده صورة، الصورة نفسها بتكون مصممة وفيها كل الكلام المطلوب، فمش بنحط أي نص
   // فوقها خالص (لا عنوان ولا شارة "عرض خاص"). النص بيظهر بس لو البانر من غير صورة
   var hasImage = !!b.imageUrl;
-  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);'
+  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);aspect-ratio:12/5;min-height:0;padding:0;'
                      : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
   var textBlock = hasImage ? '' :
       '<div class="ad-title">' + b.title + '</div>' +
       (b.subtitle ? '<div class="ad-sub">' + b.subtitle + '</div>' : '') +
       '<div class="ad-cta">اضغط للتفاصيل <i class="fas fa-arrow-left"></i></div>';
-  wrap.innerHTML = '<button class="ad-banner" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
+  wrap.innerHTML = '<button class="ad-banner' + (hasImage ? ' has-img' : '') + '" style="' + bg + 'width:calc(100% - 32px);margin:14px 16px 0;animation:adFadeIn .5s ease, adPulse 2.4s ease-in-out infinite;" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
       textBlock +
       '</button>' +
       (mainBanners.length > 1 ? ('<div class="ad-dots">' + mainBanners.map(function(_,i){return '<div class="ad-dot ' + (i===adIndex?'active':'') + '"></div>';}).join('') + '</div>') : '');
@@ -2821,13 +2823,13 @@ function drawOneSecondaryBanner(offerBanners){
   var subWrap = document.getElementById('adBannerWrapSecondary');
   var b = offerBanners[subAdIndex];
   var hasImage = !!b.imageUrl;
-  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:contain;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);'
+  var bg = hasImage ? 'background-image:url(&#39;' + b.imageUrl + '&#39;);background-size:cover;background-repeat:no-repeat;background-position:center;background-color:var(--maroon-dark);aspect-ratio:12/5;min-height:0;padding:0;'
                      : 'background:linear-gradient(135deg, var(--maroon), var(--maroon-dark));';
   var textBlock = hasImage ? '' :
       '<div class="ad-sub-title">' + b.title + '</div>' +
       (b.subtitle ? '<div class="ad-sub-sub">' + b.subtitle + '</div>' : '');
   subWrap.innerHTML = '<div class="section-head" style="margin:14px 16px 6px;"><div class="section-bar" style="background:var(--gold);"></div><div class="section-title">آخر العروض</div></div>' +
-    '<button class="ad-banner-sub" style="' + bg + '" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
+    '<button class="ad-banner-sub' + (hasImage ? ' has-img' : '') + '" style="' + bg + '" onclick="handleBannerClick(&#39;' + b.id + '&#39;)">' +
       textBlock +
     '</button>' +
     (offerBanners.length > 1 ? ('<div class="ad-dots">' + offerBanners.map(function(_,i){return '<div class="ad-dot ' + (i===subAdIndex?'active':'') + '"></div>';}).join('') + '</div>') : '');
