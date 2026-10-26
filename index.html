@@ -3017,7 +3017,11 @@ function shareReferral(){
 function renderBadgeRows(){
   var setRow = function(headId, rowId, codes){
     var head = document.getElementById(headId), row = document.getElementById(rowId); if (!head || !row) return;
-    var list = inStockOnly(codes.map(function(c){ return products.find(function(p){ return p.code === c; }); }).filter(Boolean)).slice(0, 12);
+    var list = inStockOnly(codes.map(function(c){ return products.find(function(p){ return p.code === c; }); }).filter(Boolean));
+    // (2026-10-26) الأجدد الأول: بتاريخ الإضافة لو موجود، وإلا بترتيب السيستم
+    var idx = {}; codes.forEach(function(c, i){ idx[c] = i; });
+    list.sort(function(a, b){ var ta = Number(a.addedAt) || 0, tb = Number(b.addedAt) || 0; return (tb - ta) || (idx[a.code] - idx[b.code]); });
+    list = list.slice(0, 12);
     head.style.display = list.length ? 'flex' : 'none';
     row.innerHTML = list.map(function(p){ return productCardHtml(p); }).join('');
   };
