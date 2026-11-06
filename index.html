@@ -454,7 +454,10 @@
       </div>
     </div>
 
+    <div id="repOutboxBox" style="display:none;margin:12px 16px 0;padding:10px 12px;border-radius:12px;background:#fff3df;color:#8a5a00;font-size:11px;font-weight:800;"></div>
+    <div id="repRouteCard" style="margin:14px 16px 0;"></div>
     <div style="margin:16px 16px 0;">
+      <button onclick="openRepNewCustomer()" style="width:100%;margin-bottom:10px;padding:10px;border-radius:12px;border:1.5px dashed var(--maroon);background:#fff;color:var(--maroon);font-size:11.5px;font-weight:900;"><i class="fas fa-user-plus"></i> محل جديد مش متسجل؟ ضيفه</button>
       <div class="rep-field">
         <label>اختر التاجر</label>
         <div class="rep-input-wrap">
@@ -706,6 +709,8 @@
         <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
       </div>
     </div>
+    <button id="repClientNavBtn" type="button" style="width:100%;margin-bottom:10px;padding:9px;border-radius:12px;background:var(--cream);color:var(--maroon);font-size:11px;font-weight:900;"></button>
+    <div id="repClientInsights"></div>
     <button class="rep-action-btn" onclick="openRepVisitModal()">
       <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));"><i class="fas fa-route"></i></div>
       <div><div class="rep-action-title">تسجيل زيارة جديدة</div><div class="rep-action-sub">سجّل حالة الزيارة وموقعك الحالي</div></div>
@@ -717,6 +722,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="repNewCustomerModal">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:900;color:var(--maroon);"><i class="fas fa-user-plus"></i> محل جديد</div>
+      <button onclick="closeModalOverlay('repNewCustomerModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px;">هيتبعت للإدارة، وأول ما يتوافق عليه هيتضاف لعملاءك.</div>
+    <div class="rep-field"><label>اسم المحل</label><input class="form-input" id="rncShop" placeholder="مثال: سوبر ماركت النور"></div>
+    <div class="rep-field"><label>اسم صاحب المحل</label><input class="form-input" id="rncName"></div>
+    <div class="rep-field"><label>رقم التليفون</label><input class="form-input" id="rncPhone" type="tel" dir="ltr" style="text-align:left;" maxlength="11" placeholder="01xxxxxxxxx"></div>
+    <div class="rep-field"><label>الحي</label><select class="form-input" id="rncNb"></select></div>
+    <div class="rep-field"><label>العنوان بالتفصيل</label><input class="form-input" id="rncAddress"></div>
+    <div class="rep-field"><label>الموقع</label><div id="rncLocStatus" style="font-size:10.5px;color:var(--muted);"></div></div>
+    <div class="rep-field"><label>صورة المحل (اختياري)</label>
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;background:var(--cream);color:var(--maroon);font-size:11px;font-weight:800;cursor:pointer;"><i class="fas fa-camera"></i> صوّر<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="rncPickPhoto(this)"></label>
+      <span id="rncPhotoStatus" style="margin-right:8px;"></span></div>
+    <button class="btn-primary" style="width:100%;margin-top:6px;" onclick="saveRepNewCustomer()"><i class="fas fa-paper-plane"></i> ابعته للإدارة</button>
+  </div>
+</div>
 <div class="modal-overlay" id="repVisitModal">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -731,7 +755,15 @@
         <button type="button" id="repVisitFailBtn" onclick="setRepVisitStatus('غير ناجحة')" style="flex:1;padding:11px;border-radius:12px;border:2px solid #c0392b;background:#fdecea;color:#c0392b;font-weight:800;font-size:11.5px;"><i class="fas fa-circle-xmark"></i> غير ناجحة</button>
       </div>
     </div>
+    <div class="rep-field" id="repVisitFailWrap" style="display:none;">
+      <label>ليه ماطلبش؟</label>
+      <div id="repFailChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div id="repCompetitorWrap" style="display:none;margin-top:8px;"><input class="form-input" type="text" id="repCompetitorName" placeholder="اسم المنافس أو الشركة اللي بيشتري منها"></div>
+    </div>
     <div class="rep-field"><label>سبب الزيارة</label><input class="form-input" type="text" id="repVisitPurpose" placeholder="مثال: متابعة طلب، تحصيل..."></div>
+    <div class="rep-field"><label>صورة (اختياري — الرف أو المحل)</label>
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;background:var(--cream);color:var(--maroon);font-size:11px;font-weight:800;cursor:pointer;"><i class="fas fa-camera"></i> صوّر<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="repPickPhoto(this)"></label>
+      <span id="repPhotoStatus" style="font-size:10.5px;margin-right:8px;"></span></div>
     <div class="rep-field"><label>ملاحظات</label><textarea class="form-textarea" id="repVisitNotes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea></div>
     <div class="rep-field">
       <label>الموقع</label>
@@ -1596,7 +1628,7 @@ function renderRepHome(){
   document.getElementById('repClientSearch').value = '';
   renderRepProgress();
   renderRepOrdersList();
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; });
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer'; });
   var todayVisits = mine.filter(function(v){ return inCurrentSalesDay(v.date); });   // يوم البيع (9 الصبح لـ 9 الصبح)
   repClientLimit = 40;
   document.getElementById('repStatVisits').textContent = todayVisits.length;
@@ -1604,10 +1636,284 @@ function renderRepHome(){
   document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
   renderRepClientResults();
   renderRepVisitsList();
+  try { renderRepRoute(); renderRepOutboxBadge(); } catch (e) { console.error(e); }
+  if (!repMyPos) repRefreshPos(function(){ try { renderRepRoute(); } catch (e) {} });
+  setTimeout(function(){ try { replayRepOutbox(); } catch (e) {} }, 2000);
+}
+
+// ==================== تطويرات مندوب المبيعات (2026-11-06) ====================
+// 1) خط سير النهارده  2) كارت العميل الكامل + اطلب زي آخر مرة  3) سبب الزيارة الفاشلة + صورة  4) وديني للعميل / سجّل موقعه
+// 5) عميل جديد من الشارع (بيروح للسيستم بانتظار الموافقة)  6) ترتيبي بين المناديب  8) الطلب من غير نت (بيتبعت لما النت يرجع)
+// الإحصائيات (آخر طلب، يومه المعتاد) جاية من السيستم في meta/repProgress.cust
+var REP_FAIL_REASONS = ['المحل مقفول', 'عنده بضاعة', 'السعر غالي', 'بيشتري من منافس', 'الصنف مش متوفر عندنا', 'صاحب المحل مش موجود', 'تاني'];
+var repFailReason = '', repVisitPhoto = '';
+function repEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function myRepCustomers(){ return (currentRep && currentRep.type === 'sales') ? allCustomers.filter(function(c){ return String(c.salesmanCode || '') === String(currentRep.code); }) : allCustomers; }
+function repCustStats(code){ var m = (repProgressDoc && repProgressDoc.cust) || {}; return m[String(code)] || null; }
+function salesWeekdayNow(){ return new Date(Date.now() - 9 * 3600000).getDay(); }
+var WD_AR = ['الحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+var repMyPos = null;
+function repDistKm(a, b){
+  if (!a || !b || a.lat == null || b.lat == null) return null;
+  var R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+function repRefreshPos(cb){
+  if (!navigator.geolocation) { if (cb) cb(); return; }
+  navigator.geolocation.getCurrentPosition(function(p){ repMyPos = { lat: p.coords.latitude, lng: p.coords.longitude }; if (cb) cb(); }, function(){ if (cb) cb(); }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
+}
+// ---------- 1) خط سير النهارده ----------
+function repTodayRoute(){
+  var wd = salesWeekdayNow(), dayStart = salesDayStartMs(Date.now());
+  var visitedToday = {}, orderedToday = {};
+  repVisits.forEach(function(v){ if (v.kind === 'newCustomer') return; if (inCurrentSalesDay(v.date)) { visitedToday[String(v.customerCode)] = true; if (v.orderId) orderedToday[String(v.customerCode)] = true; } });
+  (repMyOrders || []).forEach(function(o){ if ((o.createdAt || 0) >= dayStart) orderedToday[String(o.customerCode)] = true; });
+  var out = [];
+  myRepCustomers().forEach(function(c){
+    var s = repCustStats(c.code) || {};
+    if ((s.l || 0) * 1000 >= dayStart) orderedToday[String(c.code)] = true;
+    var days = s.l ? Math.floor((Date.now() - s.l * 1000) / 86400000) : null;
+    var why = '';
+    if (s.u === wd) why = 'يومه المعتاد (' + WD_AR[wd] + ')';
+    else if (days != null && days >= 7) why = 'مطلبش من ' + days + ' يوم';
+    if (!why) return;
+    var st = orderedToday[String(c.code)] ? 'ordered' : (visitedToday[String(c.code)] ? 'visited' : 'todo');
+    out.push({ c: c, why: why, st: st, km: repDistKm(repMyPos, c.location), days: days });
+  });
+  out.sort(function(a, b){
+    var o = { todo: 0, visited: 1, ordered: 2 };
+    return (o[a.st] - o[b.st]) || ((a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km)) || ((b.days || 0) - (a.days || 0));
+  });
+  return out;
+}
+var repRouteOpen = false;
+function renderRepRoute(){
+  var box = document.getElementById('repRouteCard'); if (!box || !currentRep || currentRep.type !== 'sales') { if (box) box.innerHTML = ''; return; }
+  var r = repTodayRoute();
+  if (!r.length) { box.innerHTML = ''; return; }
+  var done = r.filter(function(x){ return x.st !== 'todo'; }).length;
+  var shown = repRouteOpen ? r : r.slice(0, 6);
+  var icon = { todo: '⏳', visited: '✅', ordered: '🛒' };
+  box.innerHTML = '<div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:12px 14px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-size:12px;font-weight:900;color:var(--maroon);"><i class="fas fa-map-signs"></i> خط سير النهارده</div>' +
+    '<div style="font-size:10.5px;font-weight:800;color:var(--muted);">' + done + ' من ' + r.length + ' <button onclick="repRefreshPos(renderRepRoute)" style="margin-right:6px;color:var(--maroon);font-size:10.5px;"><i class="fas fa-location-crosshairs"></i> الأقرب</button></div></div>' +
+    '<div style="height:6px;background:var(--sand);border-radius:6px;overflow:hidden;margin-bottom:8px;"><div style="height:100%;width:' + Math.round(done / r.length * 100) + '%;background:var(--success);"></div></div>' +
+    shown.map(function(x){
+      return '<div onclick="openRepClientActions(&#39;' + String(x.c.code).replace(/'/g, "\\'") + '&#39;)" style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid var(--sand);cursor:pointer;' + (x.st !== 'todo' ? 'opacity:.55;' : '') + '">' +
+        '<span style="font-size:15px;">' + icon[x.st] + '</span>' +
+        '<div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:900;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + repEsc(x.c.shopName || x.c.name || x.c.code) + '</div>' +
+        '<div style="font-size:10px;color:var(--muted);">' + repEsc(x.why) + (x.km != null ? ' · ' + (x.km < 1 ? Math.round(x.km * 1000) + ' متر' : x.km.toFixed(1) + ' كم') : '') + '</div></div>' +
+        '<i class="fas fa-chevron-left" style="color:var(--muted);font-size:10px;"></i></div>';
+    }).join('') +
+    (r.length > 6 ? '<button onclick="repRouteOpen=!repRouteOpen;renderRepRoute()" style="width:100%;margin-top:6px;color:var(--maroon);font-size:11px;font-weight:800;">' + (repRouteOpen ? 'أقل' : 'اعرض الكل (' + r.length + ')') + '</button>' : '') +
+  '</div>';
+}
+// ---------- 2) كارت العميل ----------
+var repCardHistory = { code: null, orders: [] };
+function loadRepCustomerHistory(cust){
+  var box = document.getElementById('repClientInsights'); if (!box) return;
+  box.innerHTML = '<div style="font-size:10.5px;color:var(--muted);padding:6px 0;">بيحمّل تاريخ العميل...</div>';
+  var ids = [String(cust.code)];
+  var ph = digitsOnly(cust.phone).slice(-10); if (ph.length === 10) { ids.push('0' + ph); ids.push(ph); }
+  ids = ids.filter(function(v, i, a){ return a.indexOf(v) === i; }).slice(0, 10);
+  if (!db) return;
+  db.collection('customerOrders').where('customerCode', 'in', ids).get().then(function(snap){
+    if (!repTargetCustomer || String(repTargetCustomer.code) !== String(cust.code)) return;
+    var orders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'rejected' && o.status !== 'merged' && o.status !== 'cancelled'; })
+      .sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+    repCardHistory = { code: cust.code, orders: orders };
+    renderRepCustomerInsights(cust);
+  }).catch(function(e){ console.error('customer history', e); box.innerHTML = ''; renderRepCustomerInsights(cust); });
+}
+function renderRepCustomerInsights(cust){
+  var box = document.getElementById('repClientInsights'); if (!box) return;
+  var orders = repCardHistory.code === cust.code ? repCardHistory.orders : [];
+  var s = repCustStats(cust.code) || {};
+  var last = orders[0];
+  var lastAt = last ? last.createdAt : (s.l ? s.l * 1000 : 0);
+  var days = lastAt ? Math.floor((Date.now() - lastAt) / 86400000) : null;
+  var recent = orders.slice(0, 10), avg = recent.length ? recent.reduce(function(a, o){ return a + (Number(o.total) || 0); }, 0) / recent.length : 0;
+  var counts = {};
+  orders.slice(0, 10).forEach(function(o){ var seen = {}; (o.items || []).forEach(function(it){ if (it.productCode && !seen[it.productCode]) { seen[it.productCode] = 1; counts[it.productCode] = (counts[it.productCode] || 0) + 1; } }); });
+  var usual = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; }).slice(0, 6).map(function(c){ var p = products.find(function(x){ return x.code === c; }); return p ? p.name : null; }).filter(Boolean);
+  var pts = Number(cust.loyaltyPoints) || 0;
+  var cell = function(v, l){ return '<div style="flex:1;background:var(--cream);border-radius:12px;padding:8px 6px;text-align:center;"><div style="font-size:12.5px;font-weight:900;color:var(--maroon);">' + v + '</div><div style="font-size:9.5px;color:var(--muted);">' + l + '</div></div>'; };
+  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+      cell(last ? money(last.total) + ' ج' : '—', 'آخر طلب' + (last ? ' (' + new Date(last.createdAt).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ')' : '')) +
+      cell(days == null ? '—' : days + ' يوم', 'من آخر طلب') +
+      cell(avg ? money(Math.round(avg)) + ' ج' : '—', 'متوسط طلبه') +
+      cell(pts, 'نقاطه') + '</div>' +
+    (s.u != null && s.u >= 0 ? '<div style="font-size:10.5px;color:#6b5a4a;margin-bottom:6px;"><i class="fas fa-calendar-day"></i> يومه المعتاد: <b>' + WD_AR[s.u] + '</b></div>' : '') +
+    (usual.length ? '<div style="font-size:10.5px;color:#6b5a4a;margin-bottom:8px;line-height:1.8;"><i class="fas fa-box"></i> بيطلب عادة: <b>' + usual.map(repEsc).join('، ') + '</b></div>' : '') +
+    (last && (last.items || []).length ? '<button class="rep-action-btn" style="padding:10px;" onclick="startRepOrderFlow(true)"><div class="rep-action-icon" style="background:linear-gradient(135deg,#2e8b57,#1e6b42);"><i class="fas fa-rotate-right"></i></div><div><div class="rep-action-title">اطلب زي آخر مرة</div><div class="rep-action-sub">' + (last.items || []).length + ' صنف — بتتظبط على المتاح في المخزن</div></div></button>' : '');
+}
+function repFillCartFromLastOrder(){
+  var last = repCardHistory.orders[0]; if (!last) return;
+  cart = {};
+  (last.items || []).forEach(function(it){
+    var p = products.find(function(x){ return x.code === it.productCode; }); if (!p) return;
+    var unit = (p.secondaryUnit && it.unit === p.secondaryUnit.name) ? 'secondary' : 'primary';
+    var q = Math.floor(Number(it.qty) || 0); if (q <= 0) return;
+    cart[p.code] = { unit: unit, qty: (cart[p.code] && cart[p.code].unit === unit ? cart[p.code].qty : 0) + q };
+  });
+  localStorage.setItem('app_cart', JSON.stringify(cart));
+  var adj = sanitizeCart();
+  scheduleCartSync(); updateCartBadge();
+  showToast(adj ? 'اتحط آخر طلب في السلة — وفيه أصناف اتظبطت على المتاح' : 'اتحط آخر طلب في السلة ✓');
+}
+// ---------- 4) وديني للعميل / سجّل موقعه ----------
+function renderRepNavButton(cust){
+  var b = document.getElementById('repClientNavBtn'); if (!b) return;
+  if (cust.location && cust.location.lat != null) {
+    b.innerHTML = '<i class="fas fa-diamond-turn-right"></i> وديني للمحل';
+    b.onclick = function(){ var a = document.createElement('a'); a.href = 'https://www.google.com/maps/dir/?api=1&destination=' + cust.location.lat + ',' + cust.location.lng; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); }, 400); };
+  } else {
+    b.innerHTML = '<i class="fas fa-location-dot"></i> أنا في المحل — سجّل موقعه';
+    b.onclick = function(){
+      if (!navigator.geolocation) { showToast('الجهاز مش بيدعم الموقع'); return; }
+      b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> بيحدد الموقع...';
+      navigator.geolocation.getCurrentPosition(function(p){
+        var loc = { lat: p.coords.latitude, lng: p.coords.longitude };
+        cust.location = loc;
+        if (db) db.collection('customerRecords').doc(String(cust.code)).update({ location: loc }).then(function(){ showToast('اتسجل موقع المحل ✓'); }).catch(function(e){ console.error(e); showToast('تعذر حفظ الموقع', 'error'); });
+        renderRepNavButton(cust);
+      }, function(){ showToast('فعّل الـ GPS وجرب تاني', 'error'); renderRepNavButton(cust); }, { enableHighAccuracy: true, timeout: 12000 });
+    };
+  }
+}
+// ---------- 3) سبب الزيارة الفاشلة + صورة ----------
+function renderRepFailReasons(){
+  var w = document.getElementById('repVisitFailWrap'); if (!w) return;
+  w.style.display = repVisitStatusValue === 'غير ناجحة' ? '' : 'none';
+  document.getElementById('repFailChips').innerHTML = REP_FAIL_REASONS.map(function(r){
+    var on = repFailReason === r;
+    return '<button type="button" onclick="repFailReason=&#39;' + r + '&#39;;renderRepFailReasons()" style="padding:7px 11px;border-radius:99px;font-size:10.5px;font-weight:800;border:1.5px solid ' + (on ? 'var(--maroon)' : 'var(--border)') + ';background:' + (on ? 'var(--maroon)' : '#fff') + ';color:' + (on ? '#fff' : 'var(--ink)') + ';">' + r + '</button>';
+  }).join('');
+  document.getElementById('repCompetitorWrap').style.display = repFailReason === 'بيشتري من منافس' ? '' : 'none';
+}
+function repPickPhoto(inp){
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var st = document.getElementById('repPhotoStatus');
+  compressPhoto(f, 480, 0.55).then(function(url){ repVisitPhoto = url; st.innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;vertical-align:middle;"> <span style="color:var(--success);">اتضافت</span>'; })
+    .catch(function(){ st.textContent = 'تعذر قراءة الصورة'; });
+}
+function compressPhoto(file, maxSide, q){
+  return new Promise(function(res, rej){
+    var r = new FileReader();
+    r.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var k = Math.min(1, maxSide / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', q));
+      };
+      img.onerror = rej; img.src = e.target.result;
+    };
+    r.onerror = rej; r.readAsDataURL(file);
+  });
+}
+// ---------- 5) عميل جديد من الشارع ----------
+var repNewCustLoc = null, repNewCustPhoto = '';
+function openRepNewCustomer(){
+  ['rncName', 'rncShop', 'rncPhone', 'rncAddress'].forEach(function(id){ document.getElementById(id).value = ''; });
+  var sel = document.getElementById('rncNb');
+  sel.innerHTML = '<option value="">اختار الحي</option>' + (appNeighborhoods || []).map(function(n){ var name = typeof n === 'string' ? n : (n.name || ''); return name ? '<option>' + repEsc(name) + '</option>' : ''; }).join('');
+  repNewCustLoc = null; repNewCustPhoto = '';
+  document.getElementById('rncLocStatus').textContent = 'بيحدد موقع المحل...';
+  document.getElementById('rncPhotoStatus').textContent = '';
+  openModalOverlay('repNewCustomerModal');
+  if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function(p){
+    repNewCustLoc = { lat: p.coords.latitude, lng: p.coords.longitude };
+    document.getElementById('rncLocStatus').innerHTML = '<span style="color:var(--success);"><i class="fas fa-check-circle"></i> اتسجل موقع المحل</span>';
+  }, function(){ document.getElementById('rncLocStatus').textContent = 'تعذر تحديد الموقع — فعّل الـ GPS'; }, { enableHighAccuracy: true, timeout: 12000 });
+}
+function rncPickPhoto(inp){
+  var f = inp.files && inp.files[0]; if (!f) return;
+  compressPhoto(f, 480, 0.55).then(function(url){ repNewCustPhoto = url; document.getElementById('rncPhotoStatus').innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;">'; });
+}
+function saveRepNewCustomer(){
+  var name = document.getElementById('rncName').value.trim(), shop = document.getElementById('rncShop').value.trim();
+  var phone = canonicalPhone(document.getElementById('rncPhone').value.trim());
+  if (!shop && !name) { showToast('اكتب اسم المحل أو صاحبه', 'error'); return; }
+  if (!/^01[0-9]{9}$/.test(phone)) { showToast('رقم التليفون لازم يكون 11 رقم ويبدأ بـ 01', 'error'); return; }
+  var dup = allCustomers.find(function(c){ return digitsOnly(c.phone).slice(-10) === phone.slice(-10); });
+  if (dup && !confirm('الرقم ده متسجل لعميل: ' + (dup.shopName || dup.name) + '\nتبعته برضه؟')) return;
+  var rec = {
+    id: 'nc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), kind: 'newCustomer', status: 'pending', date: new Date().toISOString(),
+    repUsername: currentRep.code, repFullName: currentRep.name || '',
+    customerCode: '', customerName: name || shop, newCustomer: { name: name || shop, shopName: shop, phone: phone, neighborhood: document.getElementById('rncNb').value, address: document.getElementById('rncAddress').value.trim(), location: repNewCustLoc || null, photo: repNewCustPhoto || '' }
+  };
+  recordRepVisit(rec);
+  closeModalOverlay('repNewCustomerModal');
+  showToast('اتبعت للإدارة ✓ — هيتضاف لعملاءك أول ما يتوافق عليه', 'success', 5000);
+  renderRepHome();
+}
+// ---------- 8) الطلب من غير نت ----------
+function repOutbox(){ try { return JSON.parse(localStorage.getItem('am_rep_outbox') || '[]'); } catch (e) { return []; } }
+function setRepOutbox(a){ try { localStorage.setItem('am_rep_outbox', JSON.stringify(a)); } catch (e) {} renderRepOutboxBadge(); }
+function queueRepOrderOffline(){
+  var a = repOutbox();
+  a.push({ id: 'ob-' + Date.now(), at: Date.now(), cust: JSON.parse(JSON.stringify(repTargetCustomer)), cart: JSON.parse(JSON.stringify(cart)), notes: (document.getElementById('orderNotes') || {}).value || '' });
+  setRepOutbox(a);
+  cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
+  var nm = repTargetCustomer.shopName || repTargetCustomer.name || repTargetCustomer.code;
+  cancelRepOrderFlow();
+  showToast('مفيش نت — طلب ' + nm + ' اتحفظ على الموبايل وهيتبعت لوحده أول ما النت يرجع 📶', 'success', 6000);
+}
+function renderRepOutboxBadge(){
+  var b = document.getElementById('repOutboxBox'); if (!b) return;
+  var n = repOutbox().length;
+  b.style.display = n ? '' : 'none';
+  b.innerHTML = n ? '<i class="fas fa-cloud-arrow-up"></i> ' + n + ' طلب مستني النت عشان يتبعت' + (navigator.onLine ? ' — <button onclick="replayRepOutbox()" style="color:var(--maroon);font-weight:900;font-size:11px;">ابعت دلوقتي</button>' : '') : '';
+}
+var repOutboxBusy = false;
+function replayRepOutbox(){
+  if (repOutboxBusy || !navigator.onLine || !repMode || repTargetCustomer || Object.keys(cart || {}).length) return;
+  var a = repOutbox(); if (!a.length) return;
+  repOutboxBusy = true;
+  var e = a[0];
+  if (!products || !products.length) { repOutboxBusy = false; return; }
+  repTargetCustomer = e.cust; cart = e.cart; localStorage.setItem('app_cart', JSON.stringify(cart)); redeemPointsChecked = false;
+  try { sanitizeCart(); } catch (er) {}
+  if (!Object.keys(cart).length) {
+    repOutboxBusy = false; repTargetCustomer = null; localStorage.setItem('app_cart', '{}');
+    setRepOutbox(repOutbox().filter(function(x){ return x.id !== e.id; }));
+    showToast('طلب ' + (e.cust.shopName || e.cust.name || '') + ' المحفوظ اتلغى — الأصناف خلصت من المخزن', 'error', 6000);
+    return;
+  }
+  var n = document.getElementById('orderNotes'); if (n) n.value = e.notes || '';
+  window._repReplaying = true;
+  sendOrderToServer();
+  var t0 = Date.now();
+  var iv = setInterval(function(){
+    if (!repTargetCustomer) {            // اتبعت
+      clearInterval(iv); window._repReplaying = false; repOutboxBusy = false;
+      setRepOutbox(repOutbox().filter(function(x){ return x.id !== e.id; }));
+      showToast('اتبعت طلب محفوظ ✓');
+      setTimeout(replayRepOutbox, 1500);
+    } else if (Date.now() - t0 > 120000) { // فشل — نرجّع كل حاجة زي ما كانت ونحاول بعدين
+      clearInterval(iv); window._repReplaying = false; repOutboxBusy = false;
+      repTargetCustomer = null; cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
+      try { showLoading(false); switchScreenRaw('repHome'); setNavRoot('repHome', 'switchScreen'); renderRepHome(); } catch (er) {}
+    }
+  }, 1000);
+}
+window.addEventListener('online', function(){ setTimeout(replayRepOutbox, 3000); renderRepOutboxBadge(); });
+window.addEventListener('offline', renderRepOutboxBadge);
+setInterval(function(){ try { replayRepOutbox(); } catch (e) {} }, 90000);
+// ---------- 6) ترتيبي بين المناديب ----------
+function repRankText(){
+  if (!repProgressDoc || !repProgressDoc.reps || !currentRep) return '';
+  var arr = Object.keys(repProgressDoc.reps).map(function(k){ return { k: k, v: Number(repProgressDoc.reps[k].month) || 0 }; }).sort(function(a, b){ return b.v - a.v; });
+  var i = arr.findIndex(function(x){ return String(x.k) === String(currentRep.code); });
+  if (i < 0 || arr.length < 2) return '';
+  return '<div style="font-size:10.5px;margin-top:4px;">ترتيبك بين المناديب الشهر ده: <b>' + (i === 0 ? '🥇 الأول' : (i === 1 ? '🥈 التاني' : (i === 2 ? '🥉 التالت' : '#' + (i + 1)))) + '</b> من ' + arr.length + (i > 0 ? ' — فاضلك ' + money(arr[i - 1].v - arr[i].v) + ' ج وتعدّي اللي قبلك' : '') + '</div>';
 }
 
 function lastVisitFor(code){
-  return repVisits.find(function(v){ return String(v.customerCode) === String(code); });
+  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && String(v.customerCode) === String(code); });
 }
 var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
@@ -1667,6 +1973,7 @@ function openRepClientActions(code){
   var av = document.getElementById('repClientActionsAvatar');
   av.textContent = avatarInitial(cust.name || cust.code);
   av.style.background = avatarColor(cust.code);
+  try { renderRepNavButton(cust); renderRepCustomerInsights(cust); loadRepCustomerHistory(cust); } catch (e) { console.error(e); }
   openModalOverlay('repClientActionsModal');
 }
 
@@ -1676,6 +1983,8 @@ function openRepVisitModal(){
   closeModalOverlay('repClientActionsModal');
   document.getElementById('repVisitClientName').textContent = 'العميل: ' + (repTargetCustomer.name || repTargetCustomer.code);
   repVisitStatusValue = '';
+  repFailReason = ''; repVisitPhoto = '';
+  try { document.getElementById('repCompetitorName').value = ''; document.getElementById('repPhotoStatus').textContent = ''; renderRepFailReasons(); } catch (e) {}
   document.getElementById('repVisitPurpose').value = '';
   document.getElementById('repVisitNotes').value = '';
   document.getElementById('repVisitLocationStatus').textContent = '';
@@ -1690,6 +1999,7 @@ function setRepVisitStatus(status){
   repVisitStatusValue = status;
   document.getElementById('repVisitSuccessBtn').style.opacity = status === 'ناجحة' ? '1' : '0.5';
   document.getElementById('repVisitFailBtn').style.opacity = status === 'غير ناجحة' ? '1' : '0.5';
+  try { renderRepFailReasons(); } catch (e) {}
 }
 
 function captureRepVisitLocation(){
@@ -1706,7 +2016,7 @@ function captureRepVisitLocation(){
 // (2026-10-08) الزيارات كانت بتتبعت للسيستم مرة واحدة، ولو النت فاصل كانت بتضيع، وتاريخ الزيارات كان على الموبايل بس.
 // دلوقتي: الزيارة بتتعلم "لسه مابعتتش" لحد ما توصل، وبنعيد المحاولة كل دقيقة ولما النت يرجع، والقايمة بتتقري من السحابة.
 var repVisitsListenerStarted = false, repVisitsFirstSync = true;
-function saveRepVisitsLocal(){ try { localStorage.setItem('app_rep_visits', JSON.stringify(repVisits.slice(0, 300))); } catch (e) {} }
+function saveRepVisitsLocal(){ try { localStorage.setItem('app_rep_visits', JSON.stringify(repVisits.slice(0, 300).map(function(v){ if (v._pending || !(v.photo || v.newCustomer)) return v; var o = Object.assign({}, v); delete o.photo; if (o.newCustomer && o.newCustomer.photo) o.newCustomer = Object.assign({}, o.newCustomer, { photo: '' }); return o; }))); } catch (e) {} }
 function cleanVisitForCloud(v){ var o = Object.assign({}, v); delete o._pending; return o; }
 function flushPendingVisits(){
   if (!db) return;
@@ -1762,6 +2072,7 @@ function logOrderVisit(cust, orderId, total, merged){
 
 function saveRepVisit(){
   if (!repVisitStatusValue) { showToast('اختر حالة الزيارة'); return; }
+  if (repVisitStatusValue === 'غير ناجحة' && !repFailReason) { showToast('اختار ليه العميل ماطلبش'); return; }
   if (!repPendingLocation && !confirm('موقعك لسه ماتسجلش (فعّل الـ GPS). تحفظ الزيارة من غير موقع؟')) return;
   if (!repTargetCustomer) return;
   var cust = repTargetCustomer;
@@ -1777,6 +2088,8 @@ function saveRepVisit(){
     repLocation: repPendingLocation || null,
     customerLocation: (cust.location || repPendingLocation || null)
   };
+  if (repVisitStatusValue === 'غير ناجحة') { visit.failReason = repFailReason; var cn = (document.getElementById('repCompetitorName') || {}).value; if (cn && repFailReason === 'بيشتري من منافس') visit.competitor = cn.trim(); }
+  if (repVisitPhoto) visit.photo = repVisitPhoto;
   recordRepVisit(visit);
   if (db) {
     // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
@@ -1832,6 +2145,7 @@ function startRepProgressListener(){
   repProgressListenerStarted = true;
   whenRepAuthReady().then(function(){ db.collection('meta').doc('repProgress').onSnapshot(function(snap){
     repProgressDoc = snap.exists ? (snap.data() || {}) : null;
+    try { renderRepRoute(); } catch (e) {}
     renderRepProgress();
   }, function(err){ console.error('rep progress listener error:', err); }); });
 }
@@ -1852,6 +2166,7 @@ function renderRepProgress(){
     '<div style="display:flex;justify-content:space-between;font-size:11px;"><span>المحقق: <b>' + (p ? money(achieved) + ' ج' : '—') + '</b></span>' + (target ? '<span>الهدف: <b>' + money(target) + ' ج</b></span>' : '<span style="color:var(--muted);">مفيش هدف متحدد</span>') + '</div>' +
     (p ? '<div style="font-size:10.5px;margin-top:4px;">مبيعات النهارده: <b>' + money(p.today || 0) + ' ج</b></div>' : '') +
     (target && remain > 0 ? '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;">فاضلك ' + money(remain) + ' ج في ' + daysLeft + ' يوم — يعني حوالي ' + money(Math.ceil(remain / daysLeft)) + ' ج في اليوم</div>' : (target ? '<div style="font-size:11px;color:var(--success);font-weight:900;margin-top:4px;">🎉 حققت الهدف</div>' : '')) +
+    repRankText() +
     (repProgressDoc && repProgressDoc.updatedAt ? '<div style="font-size:9.5px;color:var(--muted);margin-top:5px;">آخر تحديث ' + timeAgoAr(repProgressDoc.updatedAt) + ' — المبيعات بتتحسب لما الطلب يتسلّم</div>' : '<div style="font-size:9.5px;color:var(--muted);margin-top:5px;">المحقق هيظهر أول ما السيستم يتفتح</div>') +
   '</div>';
 }
@@ -1860,6 +2175,7 @@ function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
   var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; }).slice(0, 20);
+  // (2026-11-06) طلبات العملاء الجداد بتظهر هنا بحالتها
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
     var d = new Date(v.date);
@@ -1875,7 +2191,7 @@ function renderRepVisitsList(){
 }
 
 // ==================== إنشاء طلب نيابة عن التاجر ====================
-function startRepOrderFlow(){
+function startRepOrderFlow(fromLast){
   if (!repTargetCustomer) return;
   closeModalOverlay('repClientActionsModal');
   var targetPhone = repTargetCustomer.phone || repTargetCustomer.code;
@@ -1893,6 +2209,7 @@ function startRepOrderFlow(){
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
     switchScreenRaw('home');
     setNavRoot('home', 'switchScreen');
+    if (fromLast === true) { try { repFillCartFromLastOrder(); } catch (e) { console.error(e); } }
     renderHome();
   });
   });
@@ -3537,6 +3854,7 @@ function findOpenSameDayOrder(code){
 }
 
 function sendOrderToServer(){
+  if (repMode && repTargetCustomer && !navigator.onLine && !window._repReplaying) { queueRepOrderOffline(); return; }
   if (sanitizeCart()) { showToast('فيه أصناف اتظبطت على المتاح في المخزن — راجع السلة وابعت تاني', 'error'); switchScreen('cart'); return; }
   var lines = getCartLineItems();
   if (lines.length === 0) return;
