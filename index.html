@@ -709,7 +709,7 @@
         <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
       </div>
     </div>
-    <button id="repClientNavBtn" type="button" style="width:100%;margin-bottom:10px;padding:9px;border-radius:12px;background:var(--cream);color:var(--maroon);font-size:11px;font-weight:900;"></button>
+    <div id="repClientNavBtn" style="width:100%;margin-bottom:10px;color:var(--maroon);font-size:11px;font-weight:900;text-align:center;cursor:pointer;"></div>
     <div id="repClientInsights"></div>
     <button class="rep-action-btn" onclick="openRepVisitModal()">
       <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));"><i class="fas fa-route"></i></div>
@@ -1765,22 +1765,64 @@ function repFillCartFromLastOrder(){
 // ---------- 4) وديني للعميل / سجّل موقعه ----------
 function renderRepNavButton(cust){
   var b = document.getElementById('repClientNavBtn'); if (!b) return;
-  if (cust.location && cust.location.lat != null) {
-    b.innerHTML = '<i class="fas fa-diamond-turn-right"></i> وديني للمحل';
-    b.onclick = function(){ var a = document.createElement('a'); a.href = 'https://www.google.com/maps/dir/?api=1&destination=' + cust.location.lat + ',' + cust.location.lng; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); }, 400); };
-  } else {
-    b.innerHTML = '<i class="fas fa-location-dot"></i> أنا في المحل — سجّل موقعه';
-    b.onclick = function(){
-      if (!navigator.geolocation) { showToast('الجهاز مش بيدعم الموقع'); return; }
-      b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> بيحدد الموقع...';
-      navigator.geolocation.getCurrentPosition(function(p){
-        var loc = { lat: p.coords.latitude, lng: p.coords.longitude };
-        cust.location = loc;
-        if (db) db.collection('customerRecords').doc(String(cust.code)).update({ location: loc }).then(function(){ showToast('اتسجل موقع المحل ✓'); }).catch(function(e){ console.error(e); showToast('تعذر حفظ الموقع', 'error'); });
-        renderRepNavButton(cust);
-      }, function(){ showToast('فعّل الـ GPS وجرب تاني', 'error'); renderRepNavButton(cust); }, { enableHighAccuracy: true, timeout: 12000 });
-    };
+  var L = cust.location, has = L && L.lat != null;
+  var badge = !has ? '' : (L.verified ? ' <span style="color:var(--success);font-size:10px;">✓ متأكد</span>' : ' <span style="color:#b26a00;font-size:10px;">⚠ مش متأكد</span>');
+  b.style.display = 'flex'; b.style.gap = '6px'; b.style.padding = '0'; b.style.background = 'none';
+  b.innerHTML = (has ? '<span onclick="repGoToShop()" style="flex:1;padding:9px;border-radius:12px;background:var(--cream);"><i class="fas fa-diamond-turn-right"></i> وديني للمحل' + badge + '</span>' : '') +
+    '<span onclick="repCaptureShopLocation()" style="flex:1;padding:9px;border-radius:12px;background:' + (has ? '#fff;border:1px solid var(--border)' : 'var(--cream)') + ';"><i class="fas fa-location-dot"></i> ' + (has ? 'حدّث موقع المحل' : 'أنا في المحل — سجّل موقعه') + '</span>';
+  b.onclick = null;
+}
+function repGoToShop(){
+  var c = repTargetCustomer; if (!c || !c.location) return;
+  var a = document.createElement('a'); a.href = 'https://www.google.com/maps/dir/?api=1&destination=' + c.location.lat + ',' + c.location.lng; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); }, 400);
+}
+// (2026-11-06) تثبيت موقع المحل بدقة: بنستنى الـ GPS لحد ما يبقى دقيق، ومش بنقبل موقع دقته وحشة
+var LOC_GOOD = 35, LOC_OK = 60;
+function repCaptureShopLocation(){
+  var cust = repTargetCustomer; if (!cust) return;
+  if (!navigator.geolocation) { showToast('الجهاز مش بيدعم الموقع', 'error'); return; }
+  var ov = document.getElementById('repLocOverlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'repLocOverlay'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  var best = null, watch = null, done = false, t0 = Date.now();
+  function close(){ done = true; if (watch != null) navigator.geolocation.clearWatch(watch); ov.style.display = 'none'; clearInterval(tick); }
+  function draw(){
+    var acc = best ? Math.round(best.acc) : null, col = acc == null ? '#8a7460' : (acc <= LOC_GOOD ? 'var(--success)' : (acc <= LOC_OK ? '#b26a00' : '#c0392b'));
+    var left = Math.max(0, 25 - Math.round((Date.now() - t0) / 1000));
+    ov.style.display = 'flex';
+    ov.innerHTML = '<div style="background:#fff;border-radius:18px;padding:18px;max-width:340px;width:100%;text-align:center;">' +
+      '<div style="font-size:13px;font-weight:900;color:var(--maroon);margin-bottom:6px;"><i class="fas fa-location-crosshairs"></i> تثبيت موقع ' + repEsc(cust.shopName || cust.name || '') + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">اقف قدام باب المحل (برّه) — الأحسن تبقى في الشارع مش جوه</div>' +
+      '<div style="font-size:26px;font-weight:900;color:' + col + ';">' + (acc == null ? '...' : acc + ' متر') + '</div>' +
+      '<div style="font-size:10.5px;color:var(--muted);margin-bottom:14px;">' + (acc == null ? 'بيدوّر على الـ GPS' : (acc <= LOC_GOOD ? 'دقة ممتازة ✓' : (acc <= LOC_OK ? 'مقبولة — استنى ثواني تتحسن' : 'دقة ضعيفة — اطلع برّه المحل'))) + (left ? ' · ' + left + ' ث' : '') + '</div>' +
+      '<div style="display:flex;gap:8px;"><button id="repLocSave" style="flex:1;padding:11px;border-radius:12px;font-weight:900;font-size:12px;' + (acc != null && acc <= LOC_OK ? 'background:var(--maroon);color:#fff;' : 'background:#eee;color:#aaa;') + '"' + (acc != null && acc <= LOC_OK ? '' : ' disabled') + '>احفظ الموقع</button>' +
+      '<button id="repLocCancel" style="flex:1;padding:11px;border-radius:12px;background:var(--cream);color:var(--maroon);font-weight:800;font-size:12px;">إلغاء</button></div></div>';
+    document.getElementById('repLocCancel').onclick = close;
+    var sv = document.getElementById('repLocSave'); if (sv && !sv.disabled) sv.onclick = function(){ var b = best; close(); repSaveShopLocation(cust, b); };
   }
+  var tick = setInterval(function(){
+    if (done) return;
+    if (Date.now() - t0 > 25000 && (!best || best.acc > LOC_OK)) { close(); showToast(best ? 'الدقة لسه ضعيفة (' + Math.round(best.acc) + ' متر) — اطلع برّه المحل وجرب تاني' : 'مش لاقي GPS — فعّل الموقع وجرب تاني', 'error', 5000); return; }
+    draw();
+  }, 1000);
+  watch = navigator.geolocation.watchPosition(function(p){
+    if (done) return;
+    var cur = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy || 999 };
+    if (!best || cur.acc < best.acc) best = cur;
+    draw();
+  }, function(){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
+  draw();
+}
+function repSaveShopLocation(cust, b){
+  if (!b || !db) return;
+  var old = cust.location && cust.location.lat != null ? cust.location : null;
+  var loc = { lat: b.lat, lng: b.lng, acc: Math.round(b.acc), at: Date.now(), by: currentRep ? currentRep.code : '', byName: currentRep ? (currentRep.name || '') : '', src: 'rep', verified: b.acc <= LOC_OK };
+  if (old) { loc.prev = { lat: old.lat, lng: old.lng, at: old.at || null, by: old.by || '' }; var d = repDistKm(old, loc); if (d != null) loc.movedM = Math.round(d * 1000); }
+  db.collection('customerRecords').doc(String(cust.code)).update({ location: loc }).then(function(){
+    cust.location = loc;
+    var c2 = allCustomers.find(function(x){ return String(x.code) === String(cust.code); }); if (c2) c2.location = loc;
+    showToast('اتثبت موقع المحل ✓ (دقة ' + loc.acc + ' متر)');
+    renderRepNavButton(cust);
+  }).catch(function(e){ console.error(e); showToast('تعذر حفظ الموقع — اتأكد من النت', 'error'); });
 }
 // ---------- 3) سبب الزيارة الفاشلة + صورة ----------
 function renderRepFailReasons(){
@@ -2006,7 +2048,7 @@ function captureRepVisitLocation(){
   if (!navigator.geolocation) { showToast('الجهاز لا يدعم تحديد الموقع'); return; }
   document.getElementById('repVisitLocationStatus').textContent = 'جاري تحديد الموقع...';
   navigator.geolocation.getCurrentPosition(function(pos){
-    repPendingLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    repPendingLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy || 999) };
     document.getElementById('repVisitLocationStatus').innerHTML = '<span style="color:var(--success);"><i class="fas fa-check-circle"></i> تم تسجيل الموقع</span>';
   }, function(err){
     document.getElementById('repVisitLocationStatus').textContent = 'تعذر تحديد الموقع';
@@ -2096,14 +2138,24 @@ function saveRepVisit(){
   if (db) {
     // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
     if (!cust.location && repPendingLocation) {
-      cust.location = repPendingLocation;
-      db.collection('customerRecords').doc(String(cust.code)).update({ location: repPendingLocation })
+      var nl = { lat: repPendingLocation.lat, lng: repPendingLocation.lng, acc: repPendingLocation.acc || null, at: Date.now(), by: currentRep ? currentRep.code : '', byName: currentRep ? (currentRep.name || '') : '', src: 'visit', verified: (repPendingLocation.acc || 999) <= LOC_OK };
+      cust.location = nl;
+      db.collection('customerRecords').doc(String(cust.code)).update({ location: nl })
         .catch(function(e){ console.error('customer location update failed:', e); });
     }
   }
   closeModalOverlay('repVisitModal');
   showToast('تم حفظ الزيارة ✓');
   renderRepHome();
+  // (2026-11-06) لو المندوب بعيد عن موقع العميل المتسجل، غالبًا الموقع غلط
+  try {
+    var far = cust.location && repPendingLocation ? repDistKm(cust.location, repPendingLocation) : null;
+    if (far != null && far > 0.3 && (repPendingLocation.acc || 999) <= 150) {
+      setTimeout(function(){
+        if (confirm('انت بعيد ' + (far < 1 ? Math.round(far * 1000) + ' متر' : far.toFixed(1) + ' كم') + ' عن موقع ' + (cust.shopName || cust.name || '') + ' المتسجل.\nشكل الموقع ده غلط — انت في المحل دلوقتي؟ تحدّثه؟')) { repTargetCustomer = cust; repCaptureShopLocation(); }
+      }, 400);
+    }
+  } catch (e) { console.error(e); }
 }
 
 // ==================== طلباتي + هدفي الشهر ده (2026-10-08) ====================
