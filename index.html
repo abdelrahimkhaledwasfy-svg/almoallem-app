@@ -11,7 +11,7 @@
 <!-- OneSignal: إشعارات فورية (Push Notifications) للعملاء حتى لو الأبليكشن قافل -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -236,6 +236,62 @@
   .rep-empty{text-align:center;padding:28px 16px;color:var(--muted);}
   .rep-empty i{font-size:30px;opacity:.35;margin-bottom:8px;display:block;}
   .rep-empty p{font-size:11px;font-weight:700;}
+  /* ============ (2026-11-06) شكل المناديب الجديد: خط أوضح وأوزان أخف وكروت أنضف ============ */
+  body.rep-ui, body.rep-ui button, body.rep-ui input, body.rep-ui select, body.rep-ui textarea{font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;}
+  body.rep-ui [style*="font-weight:900"]{font-weight:700!important;}
+  body.rep-ui [style*="font-weight:800"]{font-weight:600!important;}
+  body.rep-ui{--ink:#2B1A10;--muted:#7d6a58;--border:#EADBC2;}
+  body.rep-ui .welcome-name{font-weight:700;font-size:15px;}
+  body.rep-ui .welcome-sub{font-weight:500;}
+  body.rep-ui .rep-stat{border-radius:12px;padding:10px 6px;}
+  body.rep-ui .rep-stat b{font-weight:700;font-size:18px;font-feature-settings:"tnum";}
+  body.rep-ui .rep-stat span{font-weight:500;font-size:10px;color:#f1d3cb;}
+  body.rep-ui .rep-field label{font-weight:600;font-size:12px;color:var(--muted);}
+  body.rep-ui .rep-input-wrap input, body.rep-ui .rep-input-wrap select{font-weight:500;font-size:13px;border-width:1px;border-radius:12px;background:#fff;}
+  body.rep-ui .form-input, body.rep-ui .form-textarea, body.rep-ui .form-select{font-weight:500;font-size:13px;background:#fff;border-radius:12px;}
+  body.rep-ui .client-card{background:#fff;border-radius:14px;padding:12px 13px;box-shadow:none;align-items:center;}
+  body.rep-ui .client-avatar{border-radius:12px;font-weight:700;width:42px;height:42px;margin-top:0;}
+  body.rep-ui .client-name{font-weight:700;font-size:14px;}
+  body.rep-ui .client-shop{font-size:12px;font-weight:500;}
+  body.rep-ui .client-address{font-size:11px;}
+  body.rep-ui .client-phone-big{font-weight:600;font-size:14px;color:var(--ink);letter-spacing:.3px;}
+  body.rep-ui .client-call-btn{border-radius:10px;background:#E8F3EB;color:var(--success);width:32px;height:32px;}
+  body.rep-ui .client-visit-badge{font-weight:600;font-size:10px;border-radius:6px;}
+  body.rep-ui .client-arrow{margin-top:0;color:#c2ae95;}
+  body.rep-ui .rep-action-btn{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;}
+  body.rep-ui .rep-action-btn.main{background:var(--maroon);border-color:var(--maroon);}
+  body.rep-ui .rep-action-btn.main .rep-action-title{color:#fff;}
+  body.rep-ui .rep-action-btn.main .rep-action-sub{color:#f0d9d0;}
+  body.rep-ui .rep-action-btn.main .rep-action-icon{background:rgba(255,255,255,.16)!important;color:#fff;}
+  body.rep-ui .rep-action-icon{border-radius:11px;width:40px;height:40px;font-size:16px;}
+  body.rep-ui .rep-action-title{font-weight:600;font-size:14px;}
+  body.rep-ui .rep-action-sub{font-size:11.5px;}
+  body.rep-ui .rep-action-chev{margin-right:auto;color:#c2ae95;font-size:12px;}
+  body.rep-ui .rep-action-btn.main .rep-action-chev{color:#f0d9d0;}
+  body.rep-ui .visit-card{background:#fff;border-radius:12px;padding:11px 13px;}
+  body.rep-ui .visit-status-chip{font-weight:600;font-size:10.5px;border-radius:6px;}
+  body.rep-ui .delivery-card{background:#fff;border-radius:14px;box-shadow:none;padding:14px;}
+  body.rep-ui .delivery-status-chip{font-weight:600;font-size:10.5px;border-radius:6px;}
+  body.rep-ui .rep-empty p{font-weight:500;font-size:12px;}
+  body.rep-ui .modal-sheet{background:#FBF5EC;}
+  .dlv-pill{display:inline-flex;align-items:center;gap:5px;padding:8px 12px;border-radius:10px;background:#F7E9E6;color:var(--maroon);font-size:12px;font-weight:600;text-decoration:none;}
+  .dlv-pill.call{background:#E8F3EB;color:var(--success);}
+  .rep-sec{font-size:12.5px;font-weight:700;color:var(--ink);margin:20px 16px 8px;display:flex;align-items:center;gap:7px;}
+  .rep-sec i{color:var(--maroon);font-size:12px;}
+  .rep-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .rep-tile{background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
+  .rep-tile span{display:block;font-size:11px;color:var(--muted);font-weight:500;}
+  .rep-tile b{display:block;font-size:17px;font-weight:700;margin-top:3px;color:var(--ink);font-feature-settings:"tnum";}
+  .rep-tile b small{font-size:11px;font-weight:500;color:var(--muted);}
+  .rep-tile em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px;}
+  .rep-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .rep-chips span{background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:500;color:var(--ink);}
+  .rep-label{font-size:11.5px;font-weight:600;color:var(--muted);margin:2px 0 7px;}
+  .rep-tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:6px;margin-top:5px;}
+  .rep-tag.warn{background:#FFF1DC;color:#9A5B00;}.rep-tag.ok{background:#E8F3EB;color:#2E7D42;}.rep-tag.bad{background:#FBE9E7;color:#A32D2D;}
+  .rep-loc-btns{display:flex;gap:8px;margin:14px 0;}
+  .rep-loc-btns span{flex:1;border:1px solid var(--border);background:#fff;border-radius:12px;padding:10px 8px;font-size:12.5px;font-weight:600;text-align:center;color:var(--maroon);cursor:pointer;}
+  .rep-loc-btns span.pri{background:var(--maroon);color:#fff;border-color:var(--maroon);}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100000;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .notif-bell-btn{position:relative;width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
@@ -457,7 +513,7 @@
     <div id="repOutboxBox" style="display:none;margin:12px 16px 0;padding:10px 12px;border-radius:12px;background:#fff3df;color:#8a5a00;font-size:11px;font-weight:800;"></div>
     <div id="repRouteCard" style="margin:14px 16px 0;"></div>
     <div style="margin:16px 16px 0;">
-      <button onclick="openRepNewCustomer()" style="width:100%;margin-bottom:10px;padding:10px;border-radius:12px;border:1.5px dashed var(--maroon);background:#fff;color:var(--maroon);font-size:11.5px;font-weight:900;"><i class="fas fa-user-plus"></i> محل جديد مش متسجل؟ ضيفه</button>
+      <button onclick="openRepNewCustomer()" style="width:100%;margin-bottom:12px;padding:11px;border-radius:12px;border:1px dashed #c9a98a;background:#fff;color:var(--maroon);font-size:12.5px;font-weight:600;"><i class="fas fa-user-plus"></i> محل جديد مش متسجل؟ ضيفه</button>
       <div class="rep-field">
         <label>اختر التاجر</label>
         <div class="rep-input-wrap">
@@ -469,9 +525,9 @@
     </div>
 
     <div id="repProgressCard" style="margin:16px 16px 0;"></div>
-    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-receipt"></i> طلباتي</div>
+    <div class="rep-sec"><i class="fas fa-receipt"></i> طلباتي</div>
     <div id="repOrdersList" style="margin:0 16px;"></div>
-    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-route"></i> آخر زياراتي</div>
+    <div class="rep-sec"><i class="fas fa-route"></i> آخر زياراتي</div>
     <div id="repVisitsList" style="margin:0 16px 24px;"></div>
   </div>
 
@@ -495,7 +551,7 @@
       <div id="deliveryShortageLine" style="display:none;margin-top:10px;background:rgba(255,255,255,0.18);color:#fff;border-radius:12px;padding:8px;font-size:11.5px;text-align:center;"></div>
       <button onclick="openDeliveryDayReport()" style="margin-top:10px;width:100%;background:rgba(255,255,255,0.15);color:#fff;border-radius:12px;padding:9px;font-size:11.5px;font-weight:900;"><i class="fas fa-clipboard-list"></i> تقرير اليوم: الفلوس والمرتجع</button>
     </div>
-    <div style="margin:20px 16px 8px;font-size:12px;font-weight:900;color:var(--maroon);display:flex;align-items:center;gap:6px;"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
+    <div class="rep-sec"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
     <div id="deliveryInvoicesList" style="margin:0 16px 24px;"></div>
   </div>
 
@@ -695,29 +751,29 @@
 
 <div class="modal-overlay" id="repClientActionsModal">
   <div class="modal-sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="client-avatar" id="repClientActionsAvatar" style="width:38px;height:38px;font-size:13px;">-</div>
-        <div>
-          <div style="font-size:13px;font-weight:900;color:var(--ink);" id="repClientActionsName">-</div>
-          <div style="font-size:10.5px;color:var(--muted);" id="repClientActionsShop"></div>
-          <div style="font-size:10px;color:var(--muted);" id="repClientActionsMeta">-</div>
-        </div>
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+      <div class="client-avatar" id="repClientActionsAvatar" style="width:48px;height:48px;font-size:18px;border-radius:14px;">-</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15.5px;font-weight:700;color:var(--ink);line-height:1.4;" id="repClientActionsName">-</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:1px;" id="repClientActionsShop"></div>
+        <div style="display:none;" id="repClientActionsMeta"></div>
+        <div id="repClientLocTag"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <a class="client-call-btn" id="repClientActionsCallBtn" href="#" style="display:none;"><i class="fas fa-phone"></i></a>
-        <button onclick="closeModalOverlay('repClientActionsModal')"><i class="fas fa-xmark" style="color:#8a7460;"></i></button>
-      </div>
+      <a class="client-call-btn" id="repClientActionsCallBtn" href="#" style="display:none;width:40px;height:40px;border-radius:12px;font-size:16px;"><i class="fas fa-phone"></i></a>
+      <button onclick="closeModalOverlay('repClientActionsModal')" style="width:34px;height:34px;"><i class="fas fa-xmark" style="color:#8a7460;font-size:16px;"></i></button>
     </div>
-    <div id="repClientNavBtn" style="width:100%;margin-bottom:10px;color:var(--maroon);font-size:11px;font-weight:900;text-align:center;cursor:pointer;"></div>
+    <div id="repClientNavBtn"></div>
     <div id="repClientInsights"></div>
-    <button class="rep-action-btn" onclick="openRepVisitModal()">
-      <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--maroon),var(--maroon-dark));"><i class="fas fa-route"></i></div>
-      <div><div class="rep-action-title">تسجيل زيارة جديدة</div><div class="rep-action-sub">سجّل حالة الزيارة وموقعك الحالي</div></div>
+    <button class="rep-action-btn main" onclick="startRepOrderFlow()">
+      <div class="rep-action-icon"><i class="fas fa-cart-shopping"></i></div>
+      <div><div class="rep-action-title">طلب جديد</div><div class="rep-action-sub">تصفح المنتجات واطلب للتاجر</div></div>
+      <i class="fas fa-chevron-left rep-action-chev"></i>
     </button>
-    <button class="rep-action-btn" style="margin-bottom:0;" onclick="startRepOrderFlow()">
-      <div class="rep-action-icon" style="background:linear-gradient(135deg,var(--gold),#A9780F);"><i class="fas fa-cart-shopping"></i></div>
-      <div><div class="rep-action-title">تصفح المنتجات وإنشاء طلب</div><div class="rep-action-sub">اطلب نيابة عن التاجر ده</div></div>
+    <div id="repReorderSlot"></div>
+    <button class="rep-action-btn" style="margin-bottom:0;" onclick="openRepVisitModal()">
+      <div class="rep-action-icon" style="background:#F7E9E6;color:var(--maroon);"><i class="fas fa-clipboard-check"></i></div>
+      <div><div class="rep-action-title">تسجيل زيارة</div><div class="rep-action-sub">حالة الزيارة وموقعك</div></div>
+      <i class="fas fa-chevron-left rep-action-chev"></i>
     </button>
   </div>
 </div>
@@ -1001,7 +1057,7 @@ function notifTimeAgo(t){
   if (m < 1) return 'دلوقتي';
   if (m < 60) return 'من ' + m + ' دقيقة';
   if (m < 1440) return 'من ' + Math.floor(m / 60) + ' ساعة';
-  return new Date(t).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
+  return new Date(t).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' });
 }
 function renderNotifInbox(){
   var box = document.getElementById('notifInboxBody'); if (!box) return;
@@ -1134,13 +1190,19 @@ let allCustomers = getStorage('customers', []); // كل عملاء المعلم 
 let allSalesmen  = localStorage.getItem('app_rep_mode') === '1' ? getStorage('salesmen', []) : [];
 if (localStorage.getItem('app_rep_mode') !== '1') { try { localStorage.removeItem(amKey('salesmen')); } catch (e) {} }  // بيانات دخول المناديب (يوزر/باسورد) من قاعدة المناديب في نظام المعلم
 let repMode = localStorage.getItem('app_rep_mode') === '1';
+function applyRepUi(){ try { document.body.classList.toggle('rep-ui', !!repMode); } catch (e) {} }
+if (document.body) applyRepUi(); else document.addEventListener('DOMContentLoaded', applyRepUi);
+function repLoc(){ return repMode ? 'ar-EG-u-nu-latn' : 'ar-EG'; }
 let currentRep = JSON.parse(localStorage.getItem('app_current_rep') || 'null');
 let repTargetCustomer = null; // العميل المختار حاليًا عشان المندوب يزوره/يطلب له
 let repVisits = JSON.parse(localStorage.getItem('app_rep_visits') || '[]');
 let repPendingLocation = null;
 let repVisitStatusValue = '';
 
-function money(n){ return (n||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function money(n){
+  if (repMode) { var v = Number(n) || 0; return v.toLocaleString('en-US', { minimumFractionDigits: (Math.round(v * 100) % 100) ? 2 : 0, maximumFractionDigits: 2 }); }
+  return (n||0).toLocaleString(repLoc(),{minimumFractionDigits:2,maximumFractionDigits:2});
+}
 // *** إصلاح 2026-10-06: كل رسايل الغلط في الأبليكشن كانت بتتنادي showToast(رسالة, 'error') والدالة كانت فاكرة ***
 // التاني ده "مدة"، فالرسالة كانت بتختفي في نفس اللحظة - العميل يدوس دخول ومايشوفش أي سبب. دلوقتي الغلط بيفضل 4 ثواني وبلون أحمر.
 var toastTimer = null;
@@ -1164,8 +1226,8 @@ function getTimeValue(ts){
 function formatDate(ts){
   if (!ts) return '-';
   try {
-    if (typeof ts === 'object' && ts.toDate) return ts.toDate().toLocaleString('ar-EG');
-    return new Date(ts).toLocaleString('ar-EG');
+    if (typeof ts === 'object' && ts.toDate) return ts.toDate().toLocaleString(repLoc());
+    return new Date(ts).toLocaleString(repLoc());
   } catch(e) { return '-'; }
 }
 
@@ -1538,7 +1600,7 @@ async function doRepLoginSubmit(){
     showLoading(false);
     if (!rep) { showToast('اليوزر أو كلمة السر غلط', 'error'); return; }
     if (rep.status && rep.status !== 'نشط') { showToast('حساب المندوب موقوف حاليًا', 'error'); return; }
-    repMode = true;
+    repMode = true; applyRepUi();
     allSalesmen = salesmenList; setStorage('salesmen', salesmenList);
     currentRep = { code: rep.code, name: rep.name, type: rep.repType === 'delivery' ? 'delivery' : 'sales' };
     if (authV) currentRep.authV = authV;
@@ -1585,7 +1647,7 @@ function repLogout(){
   if (window.AlmoallemAndroid) { try { AlmoallemAndroid.logout(); } catch (e) {} }
   else { try { window.OneSignalDeferred.push(function(OneSignal){ OneSignal.logout().catch(function(){}); }); } catch (e) {} }
   try { if (firebase.auth) firebase.auth().signOut().catch(function(){}); } catch (e) {}
-  repMode = false;
+  repMode = false; applyRepUi();
   currentRep = null;
   repTargetCustomer = null;
   localStorage.removeItem('app_rep_mode');
@@ -1728,25 +1790,29 @@ function loadRepCustomerHistory(cust){
 }
 function renderRepCustomerInsights(cust){
   var box = document.getElementById('repClientInsights'); if (!box) return;
+  var slot = document.getElementById('repReorderSlot');
   var orders = repCardHistory.code === cust.code ? repCardHistory.orders : [];
   var s = repCustStats(cust.code) || {};
   var last = orders[0];
   var lastAt = last ? last.createdAt : (s.l ? s.l * 1000 : 0);
-  var days = lastAt ? Math.floor((Date.now() - lastAt) / 86400000) : null;
+  var days = lastAt ? Math.floor((salesDayStartMs(Date.now()) - salesDayStartMs(lastAt)) / 86400000) : null;
   var recent = orders.slice(0, 10), avg = recent.length ? recent.reduce(function(a, o){ return a + (Number(o.total) || 0); }, 0) / recent.length : 0;
   var counts = {};
   orders.slice(0, 10).forEach(function(o){ var seen = {}; (o.items || []).forEach(function(it){ if (it.productCode && !seen[it.productCode]) { seen[it.productCode] = 1; counts[it.productCode] = (counts[it.productCode] || 0) + 1; } }); });
-  var usual = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; }).slice(0, 6).map(function(c){ var p = products.find(function(x){ return x.code === c; }); return p ? p.name : null; }).filter(Boolean);
+  var usual = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; }).slice(0, 8).map(function(c){ var p = products.find(function(x){ return x.code === c; }); return p ? p.name : null; }).filter(Boolean);
   var pts = Number(cust.loyaltyPoints) || 0;
-  var cell = function(v, l){ return '<div style="flex:1;background:var(--cream);border-radius:12px;padding:8px 6px;text-align:center;"><div style="font-size:12.5px;font-weight:900;color:var(--maroon);">' + v + '</div><div style="font-size:9.5px;color:var(--muted);">' + l + '</div></div>'; };
-  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
-      cell(last ? money(last.total) + ' ج' : '—', 'آخر طلب' + (last ? ' (' + new Date(last.createdAt).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }) + ')' : '')) +
-      cell(days == null ? '—' : days + ' يوم', 'من آخر طلب') +
-      cell(avg ? money(Math.round(avg)) + ' ج' : '—', 'متوسط طلبه') +
-      cell(pts, 'نقاطه') + '</div>' +
-    (s.u != null && s.u >= 0 ? '<div style="font-size:10.5px;color:#6b5a4a;margin-bottom:6px;"><i class="fas fa-calendar-day"></i> يومه المعتاد: <b>' + WD_AR[s.u] + '</b></div>' : '') +
-    (usual.length ? '<div style="font-size:10.5px;color:#6b5a4a;margin-bottom:8px;line-height:1.8;"><i class="fas fa-box"></i> بيطلب عادة: <b>' + usual.map(repEsc).join('، ') + '</b></div>' : '') +
-    (last && (last.items || []).length ? '<button class="rep-action-btn" style="padding:10px;" onclick="startRepOrderFlow(true)"><div class="rep-action-icon" style="background:linear-gradient(135deg,#2e8b57,#1e6b42);"><i class="fas fa-rotate-right"></i></div><div><div class="rep-action-title">اطلب زي آخر مرة</div><div class="rep-action-sub">' + (last.items || []).length + ' صنف — بتتظبط على المتاح في المخزن</div></div></button>' : '');
+  var ago = days == null ? '' : (days <= 0 ? 'النهارده' : (days === 1 ? 'امبارح' : 'من ' + days + ' يوم'));
+  var dStr = lastAt ? new Date(lastAt).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) : '';
+  var tile = function(label, val, unit, sub){ return '<div class="rep-tile"><span>' + label + '</span><b>' + val + (unit ? ' <small>' + unit + '</small>' : '') + '</b><em>' + (sub || '&nbsp;') + '</em></div>'; };
+  var usualDay = (s.u != null && s.u >= 0) ? WD_AR[s.u] : '';
+  box.innerHTML = '<div class="rep-tiles">' +
+      tile('آخر طلب', last ? money(Math.round(last.total)) : (lastAt ? '—' : 'مفيش'), last ? 'ج' : '', [ago, dStr].filter(Boolean).join(' · ')) +
+      tile('متوسط الطلب', avg ? money(Math.round(avg)) : '—', avg ? 'ج' : '', recent.length ? 'آخر ' + recent.length + ' طلبات' : '') +
+      tile('النقاط', pts, '', 'نقطة') +
+      tile(usualDay ? 'يومه المعتاد' : 'عدد طلباته', usualDay || (s.n != null ? s.n : (orders.length || '—')), '', usualDay ? 'بيطلب كل أسبوع' : 'آخر شهرين') +
+    '</div>' +
+    (usual.length ? '<div class="rep-label">بيطلب عادة</div><div class="rep-chips">' + usual.map(function(n){ return '<span>' + repEsc(n) + '</span>'; }).join('') + '</div>' : '');
+  if (slot) slot.innerHTML = (last && (last.items || []).length) ? '<button class="rep-action-btn" onclick="startRepOrderFlow(true)"><div class="rep-action-icon" style="background:#E8F3EB;color:var(--success);"><i class="fas fa-rotate-right"></i></div><div><div class="rep-action-title">اطلب زي آخر مرة</div><div class="rep-action-sub">' + (last.items || []).length + ' أصناف · بتتظبط على المتاح</div></div><i class="fas fa-chevron-left rep-action-chev"></i></button>' : '';
 }
 function repFillCartFromLastOrder(){
   var last = repCardHistory.orders[0]; if (!last) return;
@@ -1766,11 +1832,10 @@ function repFillCartFromLastOrder(){
 function renderRepNavButton(cust){
   var b = document.getElementById('repClientNavBtn'); if (!b) return;
   var L = cust.location, has = L && L.lat != null;
-  var badge = !has ? '' : (L.verified ? ' <span style="color:var(--success);font-size:10px;">✓ متأكد</span>' : ' <span style="color:#b26a00;font-size:10px;">⚠ مش متأكد</span>');
-  b.style.display = 'flex'; b.style.gap = '6px'; b.style.padding = '0'; b.style.background = 'none';
-  b.innerHTML = (has ? '<span onclick="repGoToShop()" style="flex:1;padding:9px;border-radius:12px;background:var(--cream);"><i class="fas fa-diamond-turn-right"></i> وديني للمحل' + badge + '</span>' : '') +
-    '<span onclick="repCaptureShopLocation()" style="flex:1;padding:9px;border-radius:12px;background:' + (has ? '#fff;border:1px solid var(--border)' : 'var(--cream)') + ';"><i class="fas fa-location-dot"></i> ' + (has ? 'حدّث موقع المحل' : 'أنا في المحل — سجّل موقعه') + '</span>';
-  b.onclick = null;
+  var tag = document.getElementById('repClientLocTag');
+  if (tag) tag.innerHTML = !has ? '<span class="rep-tag warn">⚠ الموقع مش متسجل</span>' : (L.locked ? '<span class="rep-tag ok">🔒 الموقع متأكد</span>' : (L.verified ? '<span class="rep-tag ok">✓ الموقع متثبت</span>' : '<span class="rep-tag warn">⚠ الموقع مش متأكد</span>'));
+  b.innerHTML = '<div class="rep-loc-btns">' + (has ? '<span class="pri" onclick="repGoToShop()"><i class="fas fa-diamond-turn-right"></i> وديني للمحل</span><span onclick="repCaptureShopLocation()"><i class="fas fa-location-dot"></i> حدّث الموقع</span>'
+    : '<span class="pri" onclick="repCaptureShopLocation()"><i class="fas fa-location-dot"></i> أنا في المحل — سجّل الموقع</span>') + '</div>';
 }
 function repGoToShop(){
   var c = repTargetCustomer; if (!c || !c.location) return;
@@ -2034,7 +2099,7 @@ function openRepClientActions(code){
   if (!cust) return;
   repTargetCustomer = cust;
   document.getElementById('repClientActionsName').textContent = cust.name || cust.code;
-  document.getElementById('repClientActionsShop').textContent = cust.shopName || '';
+  document.getElementById('repClientActionsShop').textContent = [cust.shopName, cust.address].filter(Boolean).join(' · ');
   document.getElementById('repClientActionsMeta').textContent = cust.address || '';
   var callBtn = document.getElementById('repClientActionsCallBtn');
   if (cust.phone) { callBtn.href = 'tel:' + cust.phone; callBtn.style.display = 'flex'; }
@@ -2220,7 +2285,7 @@ function renderRepOrdersList(){
     var stText = o.status === 'pending' ? 'جديد' : st[0];
     return '<div class="visit-card"><div class="visit-card-top"><span style="font-size:11.5px;font-weight:800;">' + (o.customerName || '') + ' <span style="font-size:9.5px;color:var(--muted);">#' + String(o.id).slice(-6) + '</span></span>' +
       '<span style="font-size:10px;font-weight:900;color:' + color + ';">' + stText + '</span></div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px;"><span><i class="fas fa-clock" style="width:11px;"></i> ' + new Date(getTimeValue(o.createdAt)).toLocaleString('ar-EG') + ' — ' + (o.items || []).length + ' صنف</span><b style="color:var(--maroon);">' + money(o.total) + ' ج</b></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px;"><span><i class="fas fa-clock" style="width:11px;"></i> ' + new Date(getTimeValue(o.createdAt)).toLocaleString(repLoc()) + ' — ' + (o.items || []).length + ' صنف</span><b style="color:var(--maroon);">' + money(o.total) + ' ج</b></div>' +
       (o.status === 'returned' && o.returnReason ? '<div style="font-size:10px;color:var(--danger);margin-top:3px;">السبب: ' + o.returnReason + '</div>' : '') +
     '</div>';
   }).join('');
@@ -2271,7 +2336,7 @@ function renderRepVisitsList(){
       var st = { pending: ['⏳ مستني موافقة الإدارة', '#b26a00'], approved: ['✅ اتضاف' + (v.customerCode ? ' — كوده ' + v.customerCode : ''), 'var(--success)'], rejected: ['❌ اترفض' + (v.rejectReason ? ': ' + v.rejectReason : ''), 'var(--danger)'] }[v.status] || [v.status, 'var(--muted)'];
       return '<div class="visit-card"><div class="visit-card-top"><span style="font-size:11.5px;font-weight:800;">🆕 ' + repEsc((v.newCustomer && v.newCustomer.shopName) || v.customerName) + '</span>' +
         '<span style="font-size:10px;font-weight:800;color:' + st[1] + ';">' + repEsc(st[0]) + '</span></div>' +
-        '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + ' — طلب عميل جديد</div></div>';
+        '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString(repLoc(), { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + ' — طلب عميل جديد</div></div>';
     }
     var ok = v.status === 'ناجحة';
     return '<div class="visit-card">' +
@@ -2279,7 +2344,7 @@ function renderRepVisitsList(){
         '<span style="font-size:11.5px;font-weight:800;">' + repEsc(v.customerName) + '</span>' +
         '<span class="visit-status-chip ' + (ok ? 'ok' : 'no') + '"><i class="fas fa-' + (ok ? 'circle-check' : 'circle-xmark') + '"></i> ' + repEsc(v.status) + '</span>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + (v.failReason ? ' — ' + repEsc(v.failReason) : '') + (v.purpose ? (' — ' + repEsc(v.purpose)) : '') + (v.mock === true ? ' — <b style="color:var(--danger);">موقع مزيف</b>' : '') + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString(repLoc(), { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + (v.failReason ? ' — ' + repEsc(v.failReason) : '') + (v.purpose ? (' — ' + repEsc(v.purpose)) : '') + (v.mock === true ? ' — <b style="color:var(--danger);">موقع مزيف</b>' : '') + '</div>' +
     '</div>';
   }).join('');
 }
@@ -2433,9 +2498,9 @@ function deliveryCardsHtml(list){
       ? '<span class="delivery-status-chip wait" style="background:#E1F5EE;color:#0F6E56;"><i class="fas fa-check"></i> اتسلم' + (o.repDelivery.name ? (' — ' + o.repDelivery.name) : '') + '</span>'
       : '<span class="delivery-status-chip wait"><i class="fas fa-truck-fast"></i> خرج للتسليم</span>';
     var addr = [o.shopName, o.addressDetail, o.neighborhood].filter(Boolean).join(' - ');
-    var mapBtn = (o.location && o.location.lat) ? ('<a href="https://maps.google.com/?q=' + o.location.lat + ',' + o.location.lng + '" target="_blank" style="font-size:10px;color:var(--maroon);font-weight:800;"><i class="fas fa-location-dot"></i> فتح الموقع على الخريطة</a>') : '<span></span>';
-    var callBtn = o.phone ? ('<a href="tel:' + o.phone + '" style="font-size:10px;color:var(--maroon);font-weight:800;margin-right:10px;"><i class="fas fa-phone"></i> اتصال</a>') : '';
-    var itemsLine = (o.items || []).slice(0, 3).map(function(i){ return i.productName + ' × ' + i.qty; }).join('، ') + ((o.items || []).length > 3 ? ' ...' : '');
+    var mapBtn = (o.location && o.location.lat) ? ('<a href="https://www.google.com/maps/dir/?api=1&destination=' + o.location.lat + ',' + o.location.lng + '" target="_blank" class="dlv-pill"><i class="fas fa-diamond-turn-right"></i> وديني</a>') : '';
+    var callBtn = o.phone ? ('<a href="tel:' + o.phone + '" class="dlv-pill call"><i class="fas fa-phone"></i> اتصال</a>') : '';
+    var itemsLine = '<div class="rep-chips" style="margin:10px 0 0;">' + (o.items || []).slice(0, 4).map(function(i){ return '<span>' + repEsc(i.productName) + ' × ' + i.qty + '</span>'; }).join('') + ((o.items || []).length > 4 ? '<span style="color:var(--muted);">+' + ((o.items || []).length - 4) + ' صنف</span>' : '') + '</div>';
     return '<div class="delivery-card"' + (confirmed ? ' style="opacity:.75;"' : '') + '>' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
         '<div style="display:flex;gap:10px;align-items:center;min-width:0;">' +
@@ -2445,10 +2510,10 @@ function deliveryCardsHtml(list){
         '</div>' +
         statusHtml +
       '</div>' +
-      '<div style="font-size:10px;color:#5B4432;margin-top:8px;">' + itemsLine + '</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">' +
-        '<div style="font-size:13px;font-weight:900;color:var(--maroon);">' + money(orderPayable(o)) + ' ج.م</div>' +
-        '<div>' + callBtn + mapBtn + '</div>' +
+      itemsLine +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">' +
+        '<div><div style="font-size:11px;color:var(--muted);">المطلوب تحصيله</div><div style="font-size:18px;font-weight:700;color:var(--ink);">' + money(orderPayable(o)) + ' <span style="font-size:11px;color:var(--muted);font-weight:500;">ج</span></div></div>' +
+        '<div style="display:flex;gap:6px;">' + callBtn + mapBtn + '</div>' +
       '</div>' +
       (confirmed ? '<div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">بانتظار نظام المعلم يقفل الطلب ويعمل الفاتورة' + (o.repReturns && o.repReturns.length ? ' — فيه مرتجع بـ ' + money(o.repReturnValue) + ' ج' : '') + '</div>' :
       '<button onclick="openDeliveryInvoice(&#39;' + o.id + '&#39;)" style="width:100%;margin-top:10px;background:#fff;color:var(--maroon);border:1px solid var(--maroon);border-radius:12px;padding:9px;font-size:11px;font-weight:900;"><i class="fas fa-file-invoice"></i> الفاتورة / مرتجع</button>' +
@@ -2647,12 +2712,12 @@ function openDeliveryDayReport(){
   var dayFrom = new Date(salesDayStartTs());
   var sh = myShortageHtml();
   document.getElementById('deliveryDayReportBody').innerHTML =
-    '<div style="font-size:10.5px;color:var(--muted);margin-bottom:8px;text-align:center;">يوم البيع من ' + dayFrom.toLocaleDateString('ar-EG') + ' الساعة 9 الصبح لحد 9 الصبح اليوم اللي بعده</div>' +
+    '<div style="font-size:10.5px;color:var(--muted);margin-bottom:8px;text-align:center;">يوم البيع من ' + dayFrom.toLocaleDateString(repLoc()) + ' الساعة 9 الصبح لحد 9 الصبح اليوم اللي بعده</div>' +
     '<div style="display:flex;gap:8px;"><div style="flex:1;background:#E1F5EE;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">فلوس معاك (لسه ماسلّمتهاش)</div><b style="font-size:15px;">' + money(totalWithMe) + ' ج</b></div>' +
     '<div style="flex:1;background:#FFF4E5;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">مرتجع معاك</div><b style="font-size:15px;color:var(--danger);">' + money(totalRet) + ' ج</b></div></div>' +
     (sh ? '<div style="margin-top:8px;background:' + (myShortageBalance > 0 ? '#FDECEA;color:var(--danger)' : '#E1F5EE;color:#0F6E56') + ';border-radius:12px;padding:8px;text-align:center;font-size:11.5px;">' + sh + '</div>' : '') +
     sec('تحصيل النهارده (' + money0.length + ') — ' + money(totalToday) + ' ج') + (money0.map(function(r){ return row(r.customerName || '', money(r.amount) + ' ج', (r.invoiceNumber ? '#' + r.invoiceNumber : '') + (r.settledAt ? ' ✓ اتسلّم' : '')); }).join('') || '<div style="font-size:11px;color:var(--muted);">مفيش</div>') +
-    (oldUnsettled.length ? sec('فلوس من أيام قبل كده لسه معاك (' + oldUnsettled.length + ')') + oldUnsettled.map(function(r){ return row(r.customerName || '', money(r.amount) + ' ج', new Date(r.date).toLocaleDateString('ar-EG')); }).join('') : '') +
+    (oldUnsettled.length ? sec('فلوس من أيام قبل كده لسه معاك (' + oldUnsettled.length + ')') + oldUnsettled.map(function(r){ return row(r.customerName || '', money(r.amount) + ' ج', new Date(r.date).toLocaleDateString(repLoc())); }).join('') : '') +
     sec('المرتجع اللي معاك حسب الصنف') + (Object.keys(byProd).map(function(k){ var e = byProd[k]; return row(e.name, money(e.value) + ' ج', e.qty + ' ' + (e.unit || '')); }).join('') || '<div style="font-size:11px;color:var(--muted);">مفيش مرتجع معاك</div>') +
     (rets.length ? sec('المرتجع حسب العميل') + rets.map(function(o){ return '<div style="font-size:11.5px;padding:6px 0;border-bottom:1px dashed var(--border);"><div style="display:flex;justify-content:space-between;"><b>' + (o.customerName || '') + (o.repReturnKind === 'full' ? ' <span style="color:var(--danger);font-size:10px;">(الطلب كله)</span>' : '') + '</b><b style="color:var(--danger);">' + money(o.repReturnValue) + ' ج</b></div>' +
       (o.repReturns || []).map(function(r){ return '<div style="color:var(--muted);font-size:10.5px;">• ' + r.productName + ' × ' + r.qty + ' ' + (r.unit || '') + ' — ' + r.reason + '</div>'; }).join('') +
@@ -3712,7 +3777,7 @@ function downloadOrderInvoicePdf(orderId){
     '.tot{margin-top:12px;width:280px;margin-right:auto;font-size:13px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.g{font-size:16px;font-weight:900;color:#7a1f1f;border-top:2px solid #7a1f1f;margin-top:4px;padding-top:6px}' +
     '.info{font-size:12.5px;line-height:1.9}.foot{margin-top:30px;text-align:center;font-size:11px;color:#6b5646}</style></head><body>' +
     '<div class="h"><div><div class="brand">المعلم للتجارة والتوزيع</div><div class="sub">فاتورة بيع</div></div>' +
-    '<div class="info" style="text-align:left;">رقم الفاتورة: <b>' + esc(o.invoiceNumber || '-') + '</b><br>رقم الطلب: ' + esc(o.id.slice(-6)) + '<br>التاريخ: ' + when.toLocaleDateString('ar-EG') + '</div></div>' +
+    '<div class="info" style="text-align:left;">رقم الفاتورة: <b>' + esc(o.invoiceNumber || '-') + '</b><br>رقم الطلب: ' + esc(o.id.slice(-6)) + '<br>التاريخ: ' + when.toLocaleDateString(repLoc()) + '</div></div>' +
     '<div class="info">العميل: <b>' + esc(o.customerName || '') + '</b>' + (o.shopName ? ' — ' + esc(o.shopName) : '') + '<br>التليفون: ' + esc(o.phone || o.customerCode || '') +
     ([o.addressDetail, o.neighborhood, o.city].filter(Boolean).length ? '<br>العنوان: ' + esc([o.addressDetail, o.neighborhood, o.city].filter(Boolean).join(' - ')) : '') + '<br>طريقة الدفع: الدفع عند الاستلام</div>' +
     '<table><thead><tr><th>#</th><th>الصنف</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>' +
