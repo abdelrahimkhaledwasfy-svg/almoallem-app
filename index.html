@@ -928,7 +928,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-06-1';
+  var APP_BUILD = '2026-11-06-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -2456,7 +2456,7 @@ function inCurrentSalesDay(ts){
   return t >= s && t < s + 86400000;
 }
 // الفلوس اللي مع المندوب ولسه ماسلّمهاش للمحاسب (من كل الأيام مش النهارده بس)
-function myUnsettledRecords(){ return deliveryHistoryInvoices.filter(function(r){ return !r.settledAt && (Number(r.amount) || 0) > 0; }); }
+function myUnsettledRecords(){ return deliveryHistoryInvoices.filter(function(r){ return !r.settledAt && (Number(r.amount) || 0) !== 0; }); }
 
 // العجز المسجل على المندوب (بيتحدّث من نظام المعلم)
 var myShortageBalance = null;
@@ -2480,7 +2480,7 @@ function myShortageHtml(){
 
 function renderDeliveryHome(){
   document.getElementById('deliveryWelcomeName').textContent = currentRep ? currentRep.name : '-';
-  var doneToday = deliveryHistoryInvoices.filter(function(r){ return r.date && inCurrentSalesDay(r.date); });
+  var doneToday = deliveryHistoryInvoices.filter(function(r){ return r.date && r.kind !== 'prevReturnRefund' && inCurrentSalesDay(r.date); });
   var withMe = myUnsettledRecords().reduce(function(s, r){ return s + (Number(r.amount) || 0); }, 0);
   document.getElementById('deliveryStatPending').textContent = deliveryInvoices.filter(function(o){ return !o.repDelivery && deliveryOwnership(o) !== 'other'; }).length;
   document.getElementById('deliveryStatDone').textContent = doneToday.length;
@@ -2528,7 +2528,7 @@ function deliveryCardsHtml(list){
         '<div><div style="font-size:11px;color:var(--muted);">المطلوب تحصيله</div><div style="font-size:18px;font-weight:700;color:var(--ink);">' + money(orderPayable(o)) + ' <span style="font-size:11px;color:var(--muted);font-weight:500;">ج</span></div></div>' +
         '<div style="display:flex;gap:6px;">' + callBtn + mapBtn + '</div>' +
       '</div>' +
-      (confirmed ? '<div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">بانتظار نظام المعلم يقفل الطلب ويعمل الفاتورة' + (o.repReturns && o.repReturns.length ? ' — فيه مرتجع بـ ' + money(o.repReturnValue) + ' ج' : '') + '</div>' :
+      (confirmed ? '<div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">بانتظار نظام المعلم يقفل الطلب ويعمل الفاتورة' + ((o.repReturns && o.repReturns.length) || (o.prevReturns && o.prevReturns.length) ? ' — فيه مرتجع بـ ' + money(o.repReturnValue) + ' ج' : '') + '</div>' :
       '<button onclick="openDeliveryInvoice(&#39;' + o.id + '&#39;)" style="width:100%;margin-top:10px;background:#fff;color:var(--maroon);border:1px solid var(--maroon);border-radius:12px;padding:9px;font-size:11px;font-weight:900;"><i class="fas fa-file-invoice"></i> الفاتورة / مرتجع</button>' +
       '<div style="display:flex;gap:8px;margin-top:8px;">' +
         '<button onclick="markInvoiceDelivered(&#39;' + o.id + '&#39;)" style="flex:1;background:var(--success);color:#fff;border-radius:12px;padding:10px;font-size:11px;font-weight:800;"><i class="fas fa-check"></i> تم التسليم والتحصيل</button>' +
@@ -2542,7 +2542,7 @@ let deliveryBusy = {};
 // (2026-10-08) تسجيل التسليم وتسجيل الفلوس في عهدة المندوب بقوا عملية واحدة (يا الاتنين يتسجلوا يا ولا واحد)
 // قبل كده كانوا خطوتين، ولو النت فصل بينهم الطلب يتقفل والفلوس ماتظهرش في العهدة خالص.
 // وكمان: بنتأكد إن الطلب مش متسجل على مندوب تاني، والمبلغ المحصّل والخصم بيتثبتوا على الطلب عشان الفاتورة تطلع بيهم بالظبط.
-function commitDelivery(orderId, inputs){
+function commitDelivery(orderId, inputs, prevInputs){
   var o = deliveryInvoices.find(function(x){ return x.id === orderId; });
   if (!o || o.repDelivery || deliveryBusy[orderId]) return Promise.resolve(null);
   if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return Promise.resolve(null); }
@@ -2553,9 +2553,16 @@ function commitDelivery(orderId, inputs){
   var recRef = db.collection('deliveryCollectionRecords').doc('DLV-ORD-' + orderId);
   var result = null, dLoc = null;
   // (2026-11-06) موقع مندوب التسليم وقت التسليم = شاهد محايد على مكان المحل
+  var prevIds = []; (prevInputs || []).forEach(function(x){ if (x.qty && prevIds.indexOf(x.oid) === -1) prevIds.push(x.oid); });
+  var prevRefs = prevIds.map(function(id){ return db.collection('customerOrders').doc(id); });
+  var refRef = db.collection('deliveryCollectionRecords').doc('DLV-RET-' + orderId);
   return repQuickPos(4000).then(function(p){ dLoc = p; if (dLoc) dLoc.mock = amIsMock(); }).then(function(){ return db.runTransaction(function(t){
-    return Promise.all([t.get(orderRef), t.get(recRef)]).then(function(snaps){
+    return Promise.all([t.get(orderRef), t.get(recRef)].concat(prevRefs.map(function(r){ return t.get(r); }))).then(function(snaps){
       var snap = snaps[0], recSnap = snaps[1];
+      // المرتجع القديم بيتحسب من أحدث نسخة للطلبات القديمة (عشان محدش يرجّع نفس الصنف مرتين)
+      var prevFresh = snaps.slice(2).map(function(ps, k){ if (!ps.exists) throw new Error('طلب قديم مش موجود'); var x = Object.assign({ id: prevIds[k] }, ps.data()); if (x.status !== 'delivered') throw new Error('الطلب القديم #' + prevIds[k].slice(-6) + ' حالته اتغيرت'); return x; });
+      var pr = computePrevReturns(prevInputs || [], prevFresh);
+      if (pr.err) throw new Error(pr.err);
       if (!snap.exists) throw new Error('الطلب مش موجود');
       var d = snap.data();
       if (d.status !== 'ready') throw new Error('حالة الطلب اتغيرت، اعمل تحديث');
@@ -2575,11 +2582,27 @@ function commitDelivery(orderId, inputs){
           repReturnPending: true, hasRepReturn: true, holdReturnStock: true, repReturnKind: 'partial'
         });
       }
+      if (pr.list.length) {
+        var allRet = (upd.repReturns || []).length ? upd.repReturnValue : 0;
+        Object.assign(upd, { prevReturns: pr.list, prevReturnValue: pr.value, repReturnValue: Math.round((allRet + pr.value) * 100) / 100,
+          repReturnAt: Date.now(), repReturnRepCode: info.code, repReturnRepName: info.name, repReturnPending: true, hasRepReturn: true });
+        if (!upd.repReturnKind) upd.repReturnKind = 'prev';
+        info.prevRefund = pr.value;
+        upd.repDelivery = info;
+        prevFresh.forEach(function(po){
+          var m = Object.assign({}, po.prevReturnedQty || {});
+          pr.list.filter(function(r){ return r.fromOrderId === po.id; }).forEach(function(r){ var k = prevItemKey(r); m[k] = (Number(m[k]) || 0) + r.qty; });
+          t.update(db.collection('customerOrders').doc(po.id), { prevReturnedQty: m, prevReturnedAt: Date.now() });
+        });
+        // الفلوس اللي رجعت للعميل بتتخصم من عهدة المندوب (سجل بالسالب)
+        t.set(refRef, { id: 'DLV-RET-' + orderId, date: new Date(info.at).toISOString(), repUsername: info.code, repFullName: info.name, orderId: orderId, invoiceId: null, invoiceNumber: '',
+          customerName: (d.customerName || '') + ' — مرتجع من طلب قديم', amount: -pr.value, kind: 'prevReturnRefund', settled: false, customerCode: d.customerCode || '', customerPhone: d.phone || '' });
+      }
       t.update(orderRef, upd);
       t.set(recRef, { id: 'DLV-ORD-' + orderId, date: new Date(info.at).toISOString(), repUsername: info.code, repFullName: info.name,
         orderId: orderId, invoiceId: null, invoiceNumber: '', customerName: d.customerName || '', amount: c.payable, settled: false,
         customerCode: d.customerCode || '', customerPhone: d.phone || '', deliveryLocation: dLoc || null }, { merge: true });
-      result = { payable: c.payable, returnsCount: c.returns.length, returnsValue: c.returnsValue };
+      result = { payable: c.payable, returnsCount: c.returns.length + pr.list.length, returnsValue: c.returnsValue + pr.value, prevValue: pr.value };
     });
   }); }).then(function(){ return result; }).catch(function(e){
     console.error('delivery commit failed:', e);
@@ -2615,6 +2638,8 @@ function openDeliveryInvoice(orderId){
   var o = deliveryInvoices.find(function(x){ return x.id === orderId; });
   if (!o) return;
   deliveryInvOrderId = orderId; deliveryReturnMode = false;
+  prevRetOpen = false; prevRetLoadedFor = null; prevRetOrders = [];
+  var bdy = document.getElementById('deliveryInvoiceBody'); if (bdy) bdy.innerHTML = '';
   renderDeliveryInvoice();
   openModalOverlay('deliveryInvoiceModal');
 }
@@ -2629,6 +2654,91 @@ function deliveryReturnInputs(){
   });
   return out;
 }
+// ==================== (2026-11-06) مرتجع من طلب قديم ====================
+// العميل بيرجّع صنف من طلب اتسلّم قبل كده (آخر 30 يوم) وقت تسليم طلبه الجديد. قيمته بتتخصم من المطلوب تحصيله،
+// ولو أكبر من الطلبية المندوب بيدفع الفرق للعميل كاش. البضاعة بتفضل مع المندوب لحد ما المخزن يستلمها،
+// ونظام المعلم بيعمل مرتجع مبيعات على الفاتورة القديمة. مايتعملش من غير طلبية جديدة.
+var PREV_RETURN_DAYS = 30;
+var prevRetOrders = [], prevRetLoadedFor = null, prevRetOpen = false, prevRetLoading = false;
+function prevRetIds(o){
+  var ids = [String(o.customerCode || '')];
+  var ph = digitsOnly(o.phone || o.customerCode || '').slice(-10);
+  if (ph.length === 10) { ids.push('0' + ph); ids.push(ph); }
+  return ids.filter(function(v, i, a){ return v && a.indexOf(v) === i; }).slice(0, 10);
+}
+function prevItemKey(it){ return it.productCode + '|' + (it.unit || ''); }
+function loadPrevReturnOrders(o){
+  if (!db || prevRetLoading) return;
+  prevRetLoading = true; prevRetLoadedFor = o.id; prevRetOrders = [];
+  renderDeliveryInvoice();
+  var since = Date.now() - PREV_RETURN_DAYS * 86400000;
+  db.collection('customerOrders').where('customerCode', 'in', prevRetIds(o)).get().then(function(snap){
+    prevRetOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+      .filter(function(x){ return x.id !== o.id && x.status === 'delivered' && ((x.deliveredAt || (x.repDelivery && x.repDelivery.at) || x.createdAt || 0) >= since); })
+      .sort(function(a, b){ return (b.deliveredAt || b.createdAt || 0) - (a.deliveredAt || a.createdAt || 0); });
+  }).catch(function(e){ console.error('prev orders', e); showToast('تعذر تحميل طلبات العميل القديمة', 'error'); })
+    .then(function(){ prevRetLoading = false; renderDeliveryInvoice(); });
+}
+// سعر الوحدة اللي العميل دفعه فعلاً (بعد خصم النقاط لو كان فيه)
+function prevUnitPrice(ord, it){
+  var sub = (ord.items || []).reduce(function(s, x){ return s + itemLineTotal(x); }, 0);
+  var tot = Number(ord.total); var f = (sub > 0 && tot > 0 && tot < sub) ? tot / sub : 1;
+  return it.qty ? Math.round(itemLineTotal(it) / it.qty * f * 100) / 100 : 0;
+}
+function prevRemainingQty(ord, it){
+  var done = Number((ord.prevReturnedQty || {})[prevItemKey(it)]) || 0;
+  return Math.max(0, (Number(it.qty) || 0) - done);
+}
+function prevReturnInputs(){
+  var out = [];
+  document.querySelectorAll('#deliveryInvoiceBody .pr-row').forEach(function(row){
+    var q = Number(String((row.querySelector('.pr-qty') || {}).value || '0').replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })) || 0;
+    out.push({ oid: row.getAttribute('data-o'), i: Number(row.getAttribute('data-i')), qty: q, reason: (row.querySelector('.pr-reason') || {}).value || '' });
+  });
+  return out;
+}
+function computePrevReturns(inputs, ordersSrc){
+  var list = [], err = '';
+  (inputs || []).forEach(function(x){
+    if (!x.qty) return;
+    var ord = (ordersSrc || prevRetOrders).find(function(o){ return o.id === x.oid; }); if (!ord) return;
+    var it = (ord.items || [])[x.i]; if (!it) return;
+    var max = prevRemainingQty(ord, it);
+    if (x.qty < 0 || x.qty > max) { err = 'مرتجع ' + it.productName + ' لازم يكون من 0 لـ ' + max; return; }
+    if (Math.floor(x.qty) !== x.qty) { err = 'كمية مرتجع ' + it.productName + ' لازم رقم صحيح'; return; }
+    if (!x.reason) { err = 'اختار سبب مرتجع ' + it.productName; return; }
+    var price = prevUnitPrice(ord, it);
+    list.push({ fromOrderId: ord.id, fromInvoiceNumber: ord.invoiceNumber || '', fromDate: ord.deliveredAt || ord.createdAt || null, productCode: it.productCode, productName: it.productName, unit: it.unit,
+      qty: x.qty, price: price, value: Math.round(price * x.qty * 100) / 100, reason: x.reason, deductQty: computeStockDeductQty(it.productCode, it.unit, x.qty), prev: true });
+  });
+  return { err: err, list: list, value: Math.round(list.reduce(function(s, r){ return s + r.value; }, 0) * 100) / 100 };
+}
+function prevReturnsHtml(o){
+  if (prevRetLoadedFor !== o.id) return '';
+  if (prevRetLoading) return '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;">بيحمّل طلبات العميل القديمة...</div>';
+  if (!prevRetOrders.length) return '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center;background:#fff;border:1px solid var(--border);border-radius:12px;margin-top:8px;">مفيش طلبات اتسلّمت للعميل ده في آخر ' + PREV_RETURN_DAYS + ' يوم</div>';
+  var prev = prevReturnInputs();
+  return '<div style="margin-top:8px;">' + prevRetOrders.map(function(ord){
+    var when = new Date(ord.deliveredAt || ord.createdAt).toLocaleDateString(repLoc(), { weekday: 'short', day: 'numeric', month: 'short' });
+    var rows = (ord.items || []).map(function(it, i){
+      var max = prevRemainingQty(ord, it); if (!max) return '';
+      var p = prev.find(function(x){ return x.oid === ord.id && x.i === i; }) || { qty: 0, reason: '' };
+      return '<div class="pr-row" data-o="' + ord.id + '" data-i="' + i + '" style="padding:8px 0;border-top:1px solid var(--border);">' +
+        '<div style="display:flex;justify-content:space-between;font-size:12.5px;"><b>' + repEsc(it.productName) + '</b><span style="color:var(--muted);">' + it.qty + ' ' + repEsc(it.unit || '') + ' × ' + money(prevUnitPrice(ord, it)) + ' ج</span></div>' +
+        '<div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px;"><span>رجّع</span><input class="form-input pr-qty" type="number" inputmode="numeric" min="0" max="' + max + '" step="1" value="' + (p.qty || '') + '" placeholder="0" style="width:64px;padding:6px;" oninput="updateDeliveryReturnSummary()"><span style="color:var(--muted);">من ' + max + '</span>' +
+        '<select class="form-input pr-reason" style="flex:1;min-width:100px;padding:6px;" onchange="updateDeliveryReturnSummary()"><option value="">السبب...</option>' + REP_RETURN_REASONS.map(function(r){ return '<option' + (p.reason === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div></div>';
+    }).join('');
+    if (!rows) return '';
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:12px;font-weight:600;color:var(--maroon);">طلب ' + (ord.invoiceNumber ? 'فاتورة #' + ord.invoiceNumber : '#' + ord.id.slice(-6)) + ' — ' + when + '</div>' + rows + '</div>';
+  }).join('') + '</div>';
+}
+function togglePrevReturns(){
+  var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; }); if (!o) return;
+  prevRetOpen = !prevRetOpen;
+  if (prevRetOpen && prevRetLoadedFor !== o.id) { loadPrevReturnOrders(o); return; }
+  renderDeliveryInvoice();
+}
+
 // بيحسب الفاتورة بعد المرتجع: الأصناف الجديدة + تفاصيل المرتجع + المطلوب تحصيله
 function computeDeliveryAfterReturns(o, inputs){
   var items = (o.items || []).map(function(it){ return Object.assign({}, it); });
@@ -2658,6 +2768,7 @@ function renderDeliveryInvoice(){
   if (!o) { body.innerHTML = '<p style="text-align:center;color:var(--muted);">الطلب ده اتقفل</p>'; return; }
   var prev = deliveryReturnInputs();
   var confirmed = !!o.repDelivery;
+  var prevBlock = (!confirmed && prevRetOpen) ? prevReturnsHtml(o) : '';
   var rows = (o.items || []).map(function(it, i){
     var p = prev.find(function(x){ return x.i === i; }) || { qty: 0, reason: '' };
     var line = '<tr><td style="padding:6px 4px;font-weight:800;">' + it.productName + '</td><td style="text-align:center;">' + it.qty + ' ' + (it.unit || '') + '</td><td style="text-align:center;">' + money(it.price) + '</td><td style="text-align:left;font-weight:800;">' + money(it.total) + '</td></tr>';
@@ -2673,7 +2784,9 @@ function renderDeliveryInvoice(){
     '<table style="width:100%;font-size:11.5px;border-collapse:collapse;"><thead><tr style="color:var(--muted);font-size:10px;"><th style="text-align:right;">الصنف</th><th>الكمية</th><th>السعر</th><th style="text-align:left;">الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<div id="deliveryReturnSummary" style="margin-top:10px;"></div>' +
     (confirmed ? '<div style="text-align:center;color:var(--muted);font-size:11px;margin-top:10px;">اتسجل تسليمه — بانتظار نظام المعلم</div>' :
-      '<button onclick="toggleDeliveryReturnMode()" style="width:100%;margin-top:10px;background:' + (deliveryReturnMode ? '#eee' : '#FFF4E5') + ';color:var(--danger);border:1px dashed var(--danger);border-radius:12px;padding:10px;font-size:11.5px;font-weight:900;"><i class="fas fa-rotate-left"></i> ' + (deliveryReturnMode ? 'إلغاء المرتجع' : 'العميل رجّع أصناف') + '</button>' +
+      '<button onclick="toggleDeliveryReturnMode()" style="width:100%;margin-top:10px;background:' + (deliveryReturnMode ? '#eee' : '#FFF4E5') + ';color:var(--danger);border:1px dashed var(--danger);border-radius:12px;padding:10px;font-size:11.5px;font-weight:900;"><i class="fas fa-rotate-left"></i> ' + (deliveryReturnMode ? 'إلغاء المرتجع' : 'العميل رجّع أصناف من الطلب ده') + '</button>' +
+      '<button onclick="togglePrevReturns()" style="width:100%;margin-top:8px;background:' + (prevRetOpen ? '#eee' : '#fff') + ';color:var(--maroon);border:1px dashed var(--maroon);border-radius:12px;padding:10px;font-size:11.5px;font-weight:900;"><i class="fas fa-clock-rotate-left"></i> ' + (prevRetOpen ? 'إلغاء المرتجع القديم' : '+ مرتجع من طلب قديم (آخر ' + PREV_RETURN_DAYS + ' يوم)') + '</button>' +
+      '<div id="prevReturnsBox">' + prevBlock + '</div>' +
       '<button id="deliveryInvConfirmBtn" onclick="confirmDeliveryWithReturns()" style="width:100%;margin-top:8px;background:var(--success);color:#fff;border-radius:12px;padding:12px;font-size:12px;font-weight:900;"></button>');
   updateDeliveryReturnSummary();
 }
@@ -2681,26 +2794,37 @@ function updateDeliveryReturnSummary(){
   var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; });
   var box = document.getElementById('deliveryReturnSummary'); if (!o || !box) return;
   var c = computeDeliveryAfterReturns(o, deliveryReturnMode ? deliveryReturnInputs() : []);
+  var pr = prevRetOpen ? computePrevReturns(prevReturnInputs()) : { err: '', list: [], value: 0 };
+  var net = Math.round((c.payable - pr.value) * 100) / 100;
   var line = function(t, v, color){ return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;' + (color ? 'color:' + color + ';' : '') + '"><span>' + t + '</span><b>' + v + '</b></div>'; };
   box.innerHTML = line('إجمالي الفاتورة', money((o.items || []).reduce(function(s, it){ return s + itemLineTotal(it); }, 0)) + ' ج') +
     (c.returnsValue ? line('المرتجع', '- ' + money(c.returnsValue) + ' ج', 'var(--danger)') : '') +
     (c.discount ? line('خصم النقاط', '- ' + money(c.discount) + ' ج') : '') +
-    '<div style="border-top:1px dashed var(--border);margin-top:4px;padding-top:4px;">' + line('المطلوب تحصيله', money(c.payable) + ' ج', 'var(--maroon)') + '</div>' +
+    (pr.value ? line('مرتجع من طلب قديم', '- ' + money(pr.value) + ' ج', 'var(--danger)') : '') +
+    '<div style="border-top:1px dashed var(--border);margin-top:4px;padding-top:4px;">' + (net >= 0 ? line('المطلوب تحصيله', money(net) + ' ج', 'var(--maroon)') : line('ادفع للعميل كاش', money(-net) + ' ج', 'var(--danger)')) + '</div>' +
     (c.err ? '<div style="color:var(--danger);font-size:11px;">' + c.err + '</div>' : '') +
+    (pr.err ? '<div style="color:var(--danger);font-size:11px;">' + pr.err + '</div>' : '') +
     (c.allReturned ? '<div style="color:var(--danger);font-size:11px;">العميل رجّع كل الأصناف — استخدم زرار "لم يتم" بدل كده.</div>' : '');
   var btn = document.getElementById('deliveryInvConfirmBtn');
-  if (btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم التسليم وتحصيل ' + money(c.payable) + ' ج'; btn.disabled = !!c.err || c.allReturned; btn.style.opacity = btn.disabled ? .5 : 1; }
+  if (btn) { btn.innerHTML = '<i class="fas fa-check"></i> ' + (net >= 0 ? 'تم التسليم وتحصيل ' + money(net) + ' ج' : 'تم التسليم ودفعت للعميل ' + money(-net) + ' ج'); btn.disabled = !!c.err || !!pr.err || c.allReturned; btn.style.opacity = btn.disabled ? .5 : 1; }
 }
 function confirmDeliveryWithReturns(){
   var o = deliveryInvoices.find(function(x){ return x.id === deliveryInvOrderId; });
   if (!o || o.repDelivery || deliveryBusy[o.id]) return;
   if (!db) { showToast('لا يوجد اتصال بالإنترنت', 'error'); return; }
   var inputs = deliveryReturnMode ? deliveryReturnInputs() : [];
+  var pInputs = prevRetOpen ? prevReturnInputs() : [];
   var c0 = computeDeliveryAfterReturns(o, inputs);
+  var p0 = computePrevReturns(pInputs);
   if (c0.err) { showToast(c0.err, 'error'); return; }
+  if (p0.err) { showToast(p0.err, 'error'); return; }
   if (c0.allReturned) { showToast('العميل رجّع كل حاجة — استخدم "لم يتم"', 'error'); return; }
-  if (!confirm('تأكيد تسليم ' + (o.customerName || '') + ' وتحصيل ' + money(c0.payable) + ' ج.م' + (c0.returns.length ? '\nومرتجع بـ ' + money(c0.returnsValue) + ' ج هيفضل معاك لحد ما تسلّمه للمخزن' : '') + '؟')) return;
-  commitDelivery(o.id, inputs).then(function(r){
+  var net0 = Math.round((c0.payable - p0.value) * 100) / 100;
+  var retV = c0.returnsValue + p0.value;
+  if (!confirm('تأكيد تسليم ' + (o.customerName || '') + '\n' + (net0 >= 0 ? 'تحصيل ' + money(net0) + ' ج.م' : '⚠ تدفع للعميل كاش ' + money(-net0) + ' ج.م') +
+    (p0.list.length ? '\n(الفاتورة ' + money(c0.payable) + ' ج − مرتجع قديم ' + money(p0.value) + ' ج)' : '') +
+    (retV ? '\nومرتجع بـ ' + money(retV) + ' ج هيفضل معاك لحد ما تسلّمه للمخزن' : '') + '؟')) return;
+  commitDelivery(o.id, inputs, pInputs).then(function(r){
     if (!r) return;
     closeModalOverlay('deliveryInvoiceModal');
     showToast(r.returnsCount ? 'تم التسليم ✓ والمرتجع اتسجل عليك' : 'تم تسجيل التسليم والتحصيل ✓');
@@ -2719,7 +2843,7 @@ function openDeliveryDayReport(){
   var totalWithMe = unsettled.reduce(function(s, r){ return s + (Number(r.amount) || 0); }, 0);
   var totalRet = rets.filter(function(o){ return o.repReturnPending; }).reduce(function(s, o){ return s + (Number(o.repReturnValue) || 0); }, 0);
   var byProd = {};
-  rets.filter(function(o){ return o.repReturnPending; }).forEach(function(o){ (o.repReturns || []).forEach(function(r){ var k = r.productCode + '|' + r.unit; var e = byProd[k] || (byProd[k] = { name: r.productName, unit: r.unit, qty: 0, value: 0 }); e.qty += Number(r.qty) || 0; e.value += Number(r.value) || 0; }); });
+  rets.filter(function(o){ return o.repReturnPending; }).forEach(function(o){ (o.repReturns || []).concat(o.prevReturns || []).forEach(function(r){ var k = r.productCode + '|' + r.unit; var e = byProd[k] || (byProd[k] = { name: r.productName, unit: r.unit, qty: 0, value: 0 }); e.qty += Number(r.qty) || 0; e.value += Number(r.value) || 0; }); });
   var sec = function(t){ return '<div style="font-size:12px;font-weight:900;color:var(--maroon);margin:14px 0 6px;">' + t + '</div>'; };
   var row = function(a, b, c){ return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 0;border-bottom:1px dashed var(--border);"><span>' + a + '</span><span style="color:var(--muted);">' + (c || '') + '</span><b>' + b + '</b></div>'; };
   var dayFrom = new Date(salesDayStartTs());
@@ -2733,7 +2857,7 @@ function openDeliveryDayReport(){
     (oldUnsettled.length ? sec('فلوس من أيام قبل كده لسه معاك (' + oldUnsettled.length + ')') + oldUnsettled.map(function(r){ return row(r.customerName || '', money(r.amount) + ' ج', new Date(r.date).toLocaleDateString(repLoc())); }).join('') : '') +
     sec('المرتجع اللي معاك حسب الصنف') + (Object.keys(byProd).map(function(k){ var e = byProd[k]; return row(e.name, money(e.value) + ' ج', e.qty + ' ' + (e.unit || '')); }).join('') || '<div style="font-size:11px;color:var(--muted);">مفيش مرتجع معاك</div>') +
     (rets.length ? sec('المرتجع حسب العميل') + rets.map(function(o){ return '<div style="font-size:11.5px;padding:6px 0;border-bottom:1px dashed var(--border);"><div style="display:flex;justify-content:space-between;"><b>' + (o.customerName || '') + (o.repReturnKind === 'full' ? ' <span style="color:var(--danger);font-size:10px;">(الطلب كله)</span>' : '') + '</b><b style="color:var(--danger);">' + money(o.repReturnValue) + ' ج</b></div>' +
-      (o.repReturns || []).map(function(r){ return '<div style="color:var(--muted);font-size:10.5px;">• ' + r.productName + ' × ' + r.qty + ' ' + (r.unit || '') + ' — ' + r.reason + '</div>'; }).join('') +
+      (o.repReturns || []).concat(o.prevReturns || []).map(function(r){ return '<div style="color:var(--muted);font-size:10.5px;">• ' + r.productName + ' × ' + r.qty + ' ' + (r.unit || '') + ' — ' + r.reason + (r.prev ? ' <b style="color:var(--maroon);">(من طلب قديم)</b>' : '') + '</div>'; }).join('') +
       '<div style="font-size:10px;margin-top:2px;color:' + (o.repReturnPending ? 'var(--danger)' : 'var(--success)') + ';">' + (o.repReturnPending ? 'لسه معاك — سلّمه للمخزن' : '✓ اتسلّم للمخزن') + '</div></div>'; }).join('') : '');
   openModalOverlay('deliveryDayReportModal');
 }
