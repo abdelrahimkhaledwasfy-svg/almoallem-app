@@ -1628,7 +1628,7 @@ function renderRepHome(){
   document.getElementById('repClientSearch').value = '';
   renderRepProgress();
   renderRepOrdersList();
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer'; });
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer' && !v.auto; });
   var todayVisits = mine.filter(function(v){ return inCurrentSalesDay(v.date); });   // يوم البيع (9 الصبح لـ 9 الصبح)
   repClientLimit = 40;
   document.getElementById('repStatVisits').textContent = todayVisits.length;
@@ -1667,7 +1667,7 @@ function repRefreshPos(cb){
 function repTodayRoute(){
   var wd = salesWeekdayNow(), dayStart = salesDayStartMs(Date.now());
   var visitedToday = {}, orderedToday = {};
-  repVisits.forEach(function(v){ if (v.kind === 'newCustomer') return; if (inCurrentSalesDay(v.date)) { visitedToday[String(v.customerCode)] = true; if (v.orderId) orderedToday[String(v.customerCode)] = true; } });
+  repVisits.forEach(function(v){ if (v.kind === 'newCustomer') return; if (inCurrentSalesDay(v.date)) { if (v.orderId) orderedToday[String(v.customerCode)] = true; if (!v.auto) visitedToday[String(v.customerCode)] = true; } });
   (repMyOrders || []).forEach(function(o){ if ((o.createdAt || 0) >= dayStart) orderedToday[String(o.customerCode)] = true; });
   var out = [];
   myRepCustomers().forEach(function(c){
@@ -1913,7 +1913,7 @@ function repRankText(){
 }
 
 function lastVisitFor(code){
-  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && String(v.customerCode) === String(code); });
+  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && !v.auto && String(v.customerCode) === String(code); });
 }
 var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
@@ -2053,6 +2053,8 @@ function recordRepVisit(visit){
 }
 // بعد ما المندوب يعمل طلب لعميل: بتتسجل زيارة ناجحة أوتوماتيك (الطلب والزيارة مربوطين)
 function logOrderVisit(cust, orderId, total, merged){
+  // (2026-11-06) الطلب مش زيارة — المندوب ممكن يطلب للعميل بالتليفون. الزيارة بتتسجل بس لما المندوب يسجلها بنفسه
+  return;
   if (!cust || !currentRep) return;
   var visit = {
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), date: new Date().toISOString(),
@@ -2174,7 +2176,7 @@ function renderRepProgress(){
 function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code; }).slice(0, 20);
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto; }).slice(0, 20);
   // (2026-11-06) طلبات العملاء الجداد بتظهر هنا بحالتها
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
