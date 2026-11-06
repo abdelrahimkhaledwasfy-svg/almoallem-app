@@ -1713,18 +1713,18 @@ function renderRepRoute(){
 var repCardHistory = { code: null, orders: [] };
 function loadRepCustomerHistory(cust){
   var box = document.getElementById('repClientInsights'); if (!box) return;
-  box.innerHTML = '<div style="font-size:10.5px;color:var(--muted);padding:6px 0;">بيحمّل تاريخ العميل...</div>';
+  repCardHistory = { code: null, orders: [] };
   var ids = [String(cust.code)];
   var ph = digitsOnly(cust.phone).slice(-10); if (ph.length === 10) { ids.push('0' + ph); ids.push(ph); }
   ids = ids.filter(function(v, i, a){ return a.indexOf(v) === i; }).slice(0, 10);
   if (!db) return;
   db.collection('customerOrders').where('customerCode', 'in', ids).get().then(function(snap){
     if (!repTargetCustomer || String(repTargetCustomer.code) !== String(cust.code)) return;
-    var orders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'rejected' && o.status !== 'merged' && o.status !== 'cancelled'; })
+    var orders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'rejected' && o.status !== 'returned' && o.status !== 'merged' && o.status !== 'cancelled'; })
       .sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
     repCardHistory = { code: cust.code, orders: orders };
     renderRepCustomerInsights(cust);
-  }).catch(function(e){ console.error('customer history', e); box.innerHTML = ''; renderRepCustomerInsights(cust); });
+  }).catch(function(e){ console.error('customer history', e); });
 }
 function renderRepCustomerInsights(cust){
   var box = document.getElementById('repClientInsights'); if (!box) return;
@@ -1864,7 +1864,7 @@ function renderRepFailReasons(){
 function repPickPhoto(inp){
   var f = inp.files && inp.files[0]; if (!f) return;
   var st = document.getElementById('repPhotoStatus');
-  compressPhoto(f, 480, 0.55).then(function(url){ repVisitPhoto = url; st.innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;vertical-align:middle;"> <span style="color:var(--success);">اتضافت</span>'; })
+  compressPhoto(f, 360, 0.5).then(function(url){ repVisitPhoto = url; st.innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;vertical-align:middle;"> <span style="color:var(--success);">اتضافت</span>'; })
     .catch(function(){ st.textContent = 'تعذر قراءة الصورة'; });
 }
 function compressPhoto(file, maxSide, q){
@@ -1900,7 +1900,7 @@ function openRepNewCustomer(){
 }
 function rncPickPhoto(inp){
   var f = inp.files && inp.files[0]; if (!f) return;
-  compressPhoto(f, 480, 0.55).then(function(url){ repNewCustPhoto = url; document.getElementById('rncPhotoStatus').innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;">'; });
+  compressPhoto(f, 360, 0.5).then(function(url){ repNewCustPhoto = url; document.getElementById('rncPhotoStatus').innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;">'; });
 }
 function saveRepNewCustomer(){
   var name = document.getElementById('rncName').value.trim(), shop = document.getElementById('rncShop').value.trim();
@@ -1924,7 +1924,7 @@ function repOutbox(){ try { return JSON.parse(localStorage.getItem('am_rep_outbo
 function setRepOutbox(a){ try { localStorage.setItem('am_rep_outbox', JSON.stringify(a)); } catch (e) {} renderRepOutboxBadge(); }
 function queueRepOrderOffline(){
   var a = repOutbox();
-  a.push({ id: 'ob-' + Date.now(), at: Date.now(), cust: JSON.parse(JSON.stringify(repTargetCustomer)), cart: JSON.parse(JSON.stringify(cart)), notes: (document.getElementById('orderNotes') || {}).value || '' });
+  a.push({ id: 'ob-' + Date.now(), at: Date.now(), rep: currentRep ? currentRep.code : '', cust: JSON.parse(JSON.stringify(repTargetCustomer)), cart: JSON.parse(JSON.stringify(cart)), notes: (document.getElementById('orderNotes') || {}).value || '' });
   setRepOutbox(a);
   cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
   var nm = repTargetCustomer.shopName || repTargetCustomer.name || repTargetCustomer.code;
@@ -1933,14 +1933,14 @@ function queueRepOrderOffline(){
 }
 function renderRepOutboxBadge(){
   var b = document.getElementById('repOutboxBox'); if (!b) return;
-  var n = repOutbox().length;
+  var n = repOutbox().filter(function(x){ return !x.rep || !currentRep || String(x.rep) === String(currentRep.code); }).length;
   b.style.display = n ? '' : 'none';
   b.innerHTML = n ? '<i class="fas fa-cloud-arrow-up"></i> ' + n + ' طلب مستني النت عشان يتبعت' + (navigator.onLine ? ' — <button onclick="replayRepOutbox()" style="color:var(--maroon);font-weight:900;font-size:11px;">ابعت دلوقتي</button>' : '') : '';
 }
 var repOutboxBusy = false;
 function replayRepOutbox(){
   if (repOutboxBusy || !navigator.onLine || !repMode || repTargetCustomer || Object.keys(cart || {}).length) return;
-  var a = repOutbox(); if (!a.length) return;
+  var a = repOutbox().filter(function(x){ return !x.rep || !currentRep || String(x.rep) === String(currentRep.code); }); if (!a.length) return;
   repOutboxBusy = true;
   var e = a[0];
   if (!products || !products.length) { repOutboxBusy = false; return; }
@@ -1974,7 +1974,7 @@ window.addEventListener('offline', renderRepOutboxBadge);
 setInterval(function(){ try { replayRepOutbox(); } catch (e) {} }, 90000);
 // ---------- 6) ترتيبي بين المناديب ----------
 function repRankText(){
-  if (!repProgressDoc || !repProgressDoc.reps || !currentRep) return '';
+  if (!repProgressDoc || !repProgressDoc.reps || !currentRep || repProgressDoc.monthKey !== repMonthKey(new Date())) return '';
   var arr = Object.keys(repProgressDoc.reps).map(function(k){ return { k: k, v: Number(repProgressDoc.reps[k].month) || 0 }; }).sort(function(a, b){ return b.v - a.v; });
   var i = arr.findIndex(function(x){ return String(x.k) === String(currentRep.code); });
   if (i < 0 || arr.length < 2) return '';
@@ -2267,13 +2267,19 @@ function renderRepVisitsList(){
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
     var d = new Date(v.date);
+    if (v.kind === 'newCustomer') {
+      var st = { pending: ['⏳ مستني موافقة الإدارة', '#b26a00'], approved: ['✅ اتضاف' + (v.customerCode ? ' — كوده ' + v.customerCode : ''), 'var(--success)'], rejected: ['❌ اترفض' + (v.rejectReason ? ': ' + v.rejectReason : ''), 'var(--danger)'] }[v.status] || [v.status, 'var(--muted)'];
+      return '<div class="visit-card"><div class="visit-card-top"><span style="font-size:11.5px;font-weight:800;">🆕 ' + repEsc((v.newCustomer && v.newCustomer.shopName) || v.customerName) + '</span>' +
+        '<span style="font-size:10px;font-weight:800;color:' + st[1] + ';">' + repEsc(st[0]) + '</span></div>' +
+        '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + ' — طلب عميل جديد</div></div>';
+    }
     var ok = v.status === 'ناجحة';
     return '<div class="visit-card">' +
       '<div class="visit-card-top">' +
-        '<span style="font-size:11.5px;font-weight:800;">' + v.customerName + '</span>' +
-        '<span class="visit-status-chip ' + (ok ? 'ok' : 'no') + '"><i class="fas fa-' + (ok ? 'circle-check' : 'circle-xmark') + '"></i> ' + v.status + '</span>' +
+        '<span style="font-size:11.5px;font-weight:800;">' + repEsc(v.customerName) + '</span>' +
+        '<span class="visit-status-chip ' + (ok ? 'ok' : 'no') + '"><i class="fas fa-' + (ok ? 'circle-check' : 'circle-xmark') + '"></i> ' + repEsc(v.status) + '</span>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + (v.purpose ? (' — ' + v.purpose) : '') + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:5px;"><i class="fas fa-clock" style="width:11px;"></i> ' + d.toLocaleString('ar-EG') + (v.failReason ? ' — ' + repEsc(v.failReason) : '') + (v.purpose ? (' — ' + repEsc(v.purpose)) : '') + (v.mock === true ? ' — <b style="color:var(--danger);">موقع مزيف</b>' : '') + '</div>' +
     '</div>';
   }).join('');
 }
