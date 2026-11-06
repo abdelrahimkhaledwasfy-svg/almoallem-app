@@ -1628,7 +1628,7 @@ function renderRepHome(){
   document.getElementById('repClientSearch').value = '';
   renderRepProgress();
   renderRepOrdersList();
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer' && !v.auto; });
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer' && v.kind !== 'locationChange' && !v.auto; });
   var todayVisits = mine.filter(function(v){ return inCurrentSalesDay(v.date); });   // يوم البيع (9 الصبح لـ 9 الصبح)
   repClientLimit = 40;
   document.getElementById('repStatVisits').textContent = todayVisits.length;
@@ -1667,7 +1667,7 @@ function repRefreshPos(cb){
 function repTodayRoute(){
   var wd = salesWeekdayNow(), dayStart = salesDayStartMs(Date.now());
   var visitedToday = {}, orderedToday = {};
-  repVisits.forEach(function(v){ if (v.kind === 'newCustomer') return; if (inCurrentSalesDay(v.date)) { if (v.orderId) orderedToday[String(v.customerCode)] = true; if (!v.auto) visitedToday[String(v.customerCode)] = true; } });
+  repVisits.forEach(function(v){ if (v.kind === 'newCustomer' || v.kind === 'locationChange') return; if (inCurrentSalesDay(v.date)) { if (v.orderId) orderedToday[String(v.customerCode)] = true; if (!v.auto) visitedToday[String(v.customerCode)] = true; } });
   (repMyOrders || []).forEach(function(o){ if ((o.createdAt || 0) >= dayStart) orderedToday[String(o.customerCode)] = true; });
   var out = [];
   myRepCustomers().forEach(function(c){
@@ -1812,11 +1812,38 @@ function repCaptureShopLocation(){
   }, function(){}, { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 });
   draw();
 }
+// (2026-11-06) كشف برامج الموقع المزيف — من نسخة الأندرويد الجديدة بس (القديمة بترجع null)
+function amLocInfo(){
+  try { if (window.AlmoallemAndroid && typeof window.AlmoallemAndroid.locInfo === 'function') return JSON.parse(window.AlmoallemAndroid.locInfo() || '{}'); } catch (e) {}
+  return null;
+}
+function amIsMock(){ var i = amLocInfo(); return i ? !!i.mock : null; }
+function repQuickPos(ms){
+  return new Promise(function(res){
+    if (!navigator.geolocation) { res(null); return; }
+    var done = false, t = setTimeout(function(){ if (!done) { done = true; res(null); } }, ms || 4000);
+    navigator.geolocation.getCurrentPosition(function(p){ if (done) return; done = true; clearTimeout(t); res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy || 999), at: Date.now() }); }, function(){ if (!done) { done = true; clearTimeout(t); res(null); } }, { enableHighAccuracy: true, maximumAge: 120000, timeout: ms || 4000 });
+  });
+}
 function repSaveShopLocation(cust, b){
   if (!b || !db) return;
+  if (amIsMock() === true) { alert('⚠ الموبايل شغال عليه برنامج بيغيّر الموقع (Fake GPS).\nاقفله وامسحه وبعدين ثبّت الموقع.'); return; }
   var old = cust.location && cust.location.lat != null ? cust.location : null;
+  var movedM = old ? Math.round((repDistKm(old, b) || 0) * 1000) : 0;
+  // الموقع المتأكد (من الإدارة أو مندوب التسليم) مايتغيرش غير بموافقة
+  if (old && old.locked && movedM > 80) {
+    recordRepVisit({ id: 'lc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), kind: 'locationChange', status: 'pending', date: new Date().toISOString(),
+      repUsername: currentRep ? currentRep.code : '', repFullName: currentRep ? (currentRep.name || '') : '', customerCode: cust.code, customerName: cust.shopName || cust.name || '',
+      newLocation: { lat: b.lat, lng: b.lng, acc: Math.round(b.acc) }, oldLocation: { lat: old.lat, lng: old.lng }, movedM: movedM, mock: amIsMock() });
+    showToast('الموقع ده متأكد قبل كده — طلب التغيير (' + movedM + ' متر) اتبعت للإدارة توافق عليه', 'success', 6000);
+    return;
+  }
   var loc = { lat: b.lat, lng: b.lng, acc: Math.round(b.acc), at: Date.now(), by: currentRep ? currentRep.code : '', byName: currentRep ? (currentRep.name || '') : '', src: 'rep', verified: b.acc <= LOC_OK };
-  if (old) { loc.prev = { lat: old.lat, lng: old.lng, at: old.at || null, by: old.by || '' }; var d = repDistKm(old, loc); if (d != null) loc.movedM = Math.round(d * 1000); }
+  if (old) {
+    loc.prev = { lat: old.lat, lng: old.lng, at: old.at || null, by: old.by || '' }; loc.movedM = movedM;
+    loc.moves = (Number(old.moves) || 0) + (movedM > 80 ? 1 : 0);
+    if (old.locked && movedM <= 80) { loc.locked = true; loc.confirmedBy = old.confirmedBy || ''; }
+  }
   db.collection('customerRecords').doc(String(cust.code)).update({ location: loc }).then(function(){
     cust.location = loc;
     var c2 = allCustomers.find(function(x){ return String(x.code) === String(cust.code); }); if (c2) c2.location = loc;
@@ -1955,7 +1982,7 @@ function repRankText(){
 }
 
 function lastVisitFor(code){
-  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && !v.auto && String(v.customerCode) === String(code); });
+  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && v.kind !== 'locationChange' && !v.auto && String(v.customerCode) === String(code); });
 }
 var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
@@ -2134,10 +2161,17 @@ function saveRepVisit(){
   };
   if (repVisitStatusValue === 'غير ناجحة') { visit.failReason = repFailReason; var cn = (document.getElementById('repCompetitorName') || {}).value; if (cn && repFailReason === 'بيشتري من منافس') visit.competitor = cn.trim(); }
   if (repVisitPhoto) visit.photo = repVisitPhoto;
+  try {
+    visit.mock = amIsMock();
+    if (repPendingLocation) visit.locAcc = repPendingLocation.acc || null;
+    var dK = cust.location && repPendingLocation ? repDistKm(cust.location, repPendingLocation) : null;
+    if (dK != null) visit.distM = Math.round(dK * 1000);
+  } catch (e) {}
+  if (visit.mock === true) alert('⚠ الموبايل شغال عليه برنامج بيغيّر الموقع (Fake GPS) — الزيارة اتسجلت وعليها علامة "موقع مزيف" والإدارة هتشوفها.');
   recordRepVisit(visit);
   if (db) {
     // لو العميل مالوش موقع ثابت محفوظ قبل كده، نحفظه دلوقتي من موقع المندوب وقت الزيارة
-    if (!cust.location && repPendingLocation) {
+    if (!cust.location && repPendingLocation && visit.mock !== true) {
       var nl = { lat: repPendingLocation.lat, lng: repPendingLocation.lng, acc: repPendingLocation.acc || null, at: Date.now(), by: currentRep ? currentRep.code : '', byName: currentRep ? (currentRep.name || '') : '', src: 'visit', verified: (repPendingLocation.acc || 999) <= LOC_OK };
       cust.location = nl;
       db.collection('customerRecords').doc(String(cust.code)).update({ location: nl })
@@ -2228,7 +2262,7 @@ function renderRepProgress(){
 function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto; }).slice(0, 20);
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto && v.kind !== 'locationChange'; }).slice(0, 20);
   // (2026-11-06) طلبات العملاء الجداد بتظهر هنا بحالتها
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
@@ -2433,8 +2467,9 @@ function commitDelivery(orderId, inputs){
   var info = { code: currentRep.code, name: currentRep.name || '', at: Date.now() };
   var orderRef = db.collection('customerOrders').doc(orderId);
   var recRef = db.collection('deliveryCollectionRecords').doc('DLV-ORD-' + orderId);
-  var result = null;
-  return db.runTransaction(function(t){
+  var result = null, dLoc = null;
+  // (2026-11-06) موقع مندوب التسليم وقت التسليم = شاهد محايد على مكان المحل
+  return repQuickPos(4000).then(function(p){ dLoc = p; if (dLoc) dLoc.mock = amIsMock(); }).then(function(){ return db.runTransaction(function(t){
     return Promise.all([t.get(orderRef), t.get(recRef)]).then(function(snaps){
       var snap = snaps[0], recSnap = snaps[1];
       if (!snap.exists) throw new Error('الطلب مش موجود');
@@ -2458,10 +2493,11 @@ function commitDelivery(orderId, inputs){
       }
       t.update(orderRef, upd);
       t.set(recRef, { id: 'DLV-ORD-' + orderId, date: new Date(info.at).toISOString(), repUsername: info.code, repFullName: info.name,
-        orderId: orderId, invoiceId: null, invoiceNumber: '', customerName: d.customerName || '', amount: c.payable, settled: false }, { merge: true });
+        orderId: orderId, invoiceId: null, invoiceNumber: '', customerName: d.customerName || '', amount: c.payable, settled: false,
+        customerCode: d.customerCode || '', customerPhone: d.phone || '', deliveryLocation: dLoc || null }, { merge: true });
       result = { payable: c.payable, returnsCount: c.returns.length, returnsValue: c.returnsValue };
     });
-  }).then(function(){ return result; }).catch(function(e){
+  }); }).then(function(){ return result; }).catch(function(e){
     console.error('delivery commit failed:', e);
     showToast(e && e.message ? e.message : 'تعذر تسجيل التسليم', 'error');
     return null;
