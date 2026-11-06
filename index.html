@@ -292,6 +292,10 @@
   .rep-loc-btns{display:flex;gap:8px;margin:14px 0;}
   .rep-loc-btns span{flex:1;border:1px solid var(--border);background:#fff;border-radius:12px;padding:10px 8px;font-size:12.5px;font-weight:600;text-align:center;color:var(--maroon);cursor:pointer;}
   .rep-loc-btns span.pri{background:var(--maroon);color:#fff;border-color:var(--maroon);}
+  /* (2026-11-06) شريط "بتطلب لعميل" اتنقل تحت فوق شريط التنقل — كان فوق تحت شريط الموبايل ومش باين */
+  #repOrderBanner{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:46;align-items:center;gap:10px;background:var(--maroon);color:#fff;padding:9px 14px;box-shadow:0 -4px 14px rgba(59,36,23,.18);font-family:inherit;}
+  body.rep-ordering .screen{padding-bottom:132px;}
+  body.rep-ordering .cart-footer{bottom:126px;}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100000;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .notif-bell-btn{position:relative;width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
@@ -486,9 +490,12 @@
     <button class="top-tab active" data-toptab="home" onclick="switchTopTab('home')">الرئيسية</button>
   </div>
 
-  <div id="repOrderBanner" class="hidden" style="display:none;align-items:center;justify-content:space-between;gap:8px;background:var(--gold);color:var(--ink);padding:8px 14px;font-size:11px;font-weight:800;">
-    <span>🧾 بتطلب حاليًا لصالح: <span id="repOrderBannerName">-</span></span>
-    <button onclick="cancelRepOrderFlow()" style="background:rgba(0,0,0,0.15);border-radius:8px;padding:4px 10px;font-size:10.5px;font-weight:800;">إلغاء</button>
+  <div id="repOrderBanner" class="hidden" style="display:none;">
+    <div style="min-width:0;flex:1;">
+      <div style="font-size:10.5px;color:#f0d9d0;font-weight:500;">بتطلب دلوقتي لـ</div>
+      <div id="repOrderBannerName" style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">-</div>
+    </div>
+    <button onclick="if(!Object.keys(cart||{}).length||confirm('فيه أصناف في السلة — تخرج من العميل من غير ما تبعت الطلب؟'))cancelRepOrderFlow()" style="background:#fff;color:var(--maroon);border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:700;white-space:nowrap;flex-shrink:0;"><i class="fas fa-arrow-right-from-bracket"></i> خروج من العميل</button>
   </div>
 
   <div id="repHomeScreen" class="screen">
@@ -2362,9 +2369,7 @@ function startRepOrderFlow(fromLast){
   loadCartFromCloud(targetPhone, function(){
     showLoading(false);
     updateCartBadge();
-    document.getElementById('repOrderBanner').style.display = 'flex';
-    document.getElementById('repOrderBanner').classList.remove('hidden');
-    document.getElementById('repOrderBannerName').textContent = repTargetCustomer.name || repTargetCustomer.code;
+    setRepOrderBanner(true);
     var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'flex';
     switchScreenRaw('home');
     setNavRoot('home', 'switchScreen');
@@ -2374,11 +2379,19 @@ function startRepOrderFlow(fromLast){
   });
 }
 
+function setRepOrderBanner(on){
+  var b = document.getElementById('repOrderBanner'); if (!b) return;
+  if (on && repTargetCustomer) {
+    document.getElementById('repOrderBannerName').textContent = [repTargetCustomer.shopName, repTargetCustomer.name].filter(Boolean).join(' — ') || repTargetCustomer.code;
+    b.style.display = 'flex'; b.classList.remove('hidden');
+  } else b.style.display = 'none';
+  try { document.body.classList.toggle('rep-ordering', !!(on && repTargetCustomer)); } catch (e) {}
+}
 function cancelRepOrderFlow(){
   repTargetCustomer = null;
   redeemPointsChecked = false;
   cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge();
-  document.getElementById('repOrderBanner').style.display = 'none';
+  setRepOrderBanner(false);
   var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
   switchScreenRaw('repHome');
   setNavRoot('repHome', 'switchScreen');
@@ -4100,7 +4113,7 @@ function sendOrderToServer(){
         var doneForName = repTargetCustomer.name || repTargetCustomer.code;
         logOrderVisit(repTargetCustomer, openOrder.id, cartTotal, true);
         repTargetCustomer = null;
-        document.getElementById('repOrderBanner').style.display = 'none';
+        setRepOrderBanner(false);
         var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
         switchScreenRaw('repHome');
         setNavRoot('repHome', 'switchScreen');
@@ -4188,7 +4201,7 @@ function sendOrderToServer(){
       var doneForName = repTargetCustomer.name || repTargetCustomer.code;
       logOrderVisit(repTargetCustomer, orderId, order.total, false);
       repTargetCustomer = null;
-      document.getElementById('repOrderBanner').style.display = 'none';
+      setRepOrderBanner(false);
       var bn = document.querySelector('.bottom-nav'); if (bn) bn.style.display = 'none';
       switchScreenRaw('repHome');
       setNavRoot('repHome', 'switchScreen');
