@@ -3145,21 +3145,38 @@ function pushOrReplaceScreenNav(name, via){
   }
 }
 
+// (2026-11-06) إصلاح: لما مودال يتقفل ويتفتح غيره في نفس اللحظة (زي كارت العميل ← تسجيل زيارة)
+// الرجوع (history.back) كان بيوصل متأخر ويقفل المودال الغلط، والكارت بعد كده زرار X بتاعه مايشتغلش.
+// دلوقتي: المودال بيتقفل فورًا، والرجوع اللي جاي بعده بيتجاهل، وأي فتح جديد بيستنى لحد ما الرجوع يخلص.
+var navIgnorePops = 0, navPendingPushes = 0, navIgnoreTimer = null;
+function flushNavPushes(){
+  while (navPendingPushes > 0) { navPendingPushes--; try { history.pushState({ navLen: navStack.length }, '', location.href); } catch(e){} }
+}
 function pushModalNav(modalId){
   if (isNavPopping) return;
   var top = navStack[navStack.length - 1];
   if (top && top.type === 'modal' && top.modalId === modalId) return;
   navStack.push({ type: 'modal', modalId: modalId });
-  try { history.pushState({ navLen: navStack.length }, '', location.href); } catch(e){}
+  if (navIgnorePops > 0) navPendingPushes++;
+  else { try { history.pushState({ navLen: navStack.length }, '', location.href); } catch(e){} }
 }
 
 function closeTrackedModal(modalId){
-  var top = navStack[navStack.length - 1];
-  if (!isNavPopping && top && top.type === 'modal' && top.modalId === modalId) {
-    history.back(); // popstate هيتكفل بإخفاء المودال فعليًا
+  var el = document.getElementById(modalId);
+  if (el) el.classList.remove('show');
+  if (isNavPopping) return;
+  var idx = -1;
+  for (var i = navStack.length - 1; i >= 1; i--) { if (navStack[i].type === 'modal' && navStack[i].modalId === modalId) { idx = i; break; } }
+  if (idx === -1) return;
+  if (idx === navStack.length - 1) {
+    navStack.pop();
+    if (navPendingPushes > 0) { navPendingPushes--; return; }   // الخطوة بتاعته لسه ماتسجلتش في history أصلًا
+    navIgnorePops++;
+    clearTimeout(navIgnoreTimer);
+    navIgnoreTimer = setTimeout(function(){ navIgnorePops = 0; flushNavPushes(); }, 600);   // أمان لو popstate ماوصلش
+    history.back();
   } else {
-    var el = document.getElementById(modalId);
-    if (el) el.classList.remove('show');
+    navStack.splice(idx, 1);
   }
 }
 
@@ -3173,6 +3190,7 @@ function refreshScreenAfterNav(name){
 }
 
 window.addEventListener('popstate', function(){
+  if (navIgnorePops > 0) { navIgnorePops--; if (!navIgnorePops) { clearTimeout(navIgnoreTimer); flushNavPushes(); } return; }
   if (navStack.length <= 1) return; // إحنا في جذر التطبيق، سيب زرار الموبايل يعمل اللي هو عايز يعمله (يقفل/يصغّر)
   isNavPopping = true;
   var top = navStack.pop();
