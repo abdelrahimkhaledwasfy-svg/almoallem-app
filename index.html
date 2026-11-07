@@ -296,6 +296,10 @@
   #repOrderBanner{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:46;align-items:center;gap:10px;background:var(--maroon);color:#fff;padding:9px 14px;box-shadow:0 -4px 14px rgba(59,36,23,.18);font-family:inherit;}
   body.rep-ordering .screen{padding-bottom:132px;}
   body.rep-ordering .cart-footer{bottom:126px;}
+  /* (2026-11-07) نسخة الأندرويد الحالية بترسم الصفحة تحت شريط الساعة، فالزراير اللي فوق (زي "خروج") مش بتتداس.
+     لحد ما الناس تحدّث الأبليكشن من جوجل بلاي: بنسيب مسافة فوق وشريط عنابي مكان شريط الموبايل */
+  html.am-legacy-bars body{padding-top:var(--am-top,36px);}
+  html.am-legacy-bars body::before{content:'';position:fixed;top:0;left:0;right:0;height:var(--am-top,36px);background:#4E1212;z-index:99990;pointer-events:none;}
   #toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#241512;color:var(--cream);padding:10px 18px;border-radius:99px;font-size:11.5px;font-weight:800;z-index:100000;opacity:0;transition:opacity 0.25s;max-width:90%;text-align:center;pointer-events:none;}
   #toast.show{opacity:1;}
   .notif-bell-btn{position:relative;width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
@@ -928,7 +932,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-06-2';
+  var APP_BUILD = '2026-11-07-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1106,6 +1110,17 @@ function initOneSignalForRep(){
 // (2026-10-25) الأبليكشن والسيستم على نفس الموقع (github.io) فبيشاركوا نفس التخزين على الجهاز لو اتفتحوا من نفس المتصفح.
 // عشان محدش يكتب فوق التاني (زي "customers" و"products")، كل مفاتيح الأبليكشن بقت بادئة am_
 function amKey(key){ return 'am_' + key; }
+(function(){
+  try {
+    var A = window.AlmoallemAndroid;
+    if (!A || (typeof A.insetsHandled === 'function' && A.insetsHandled())) return;
+    var de = document.documentElement; de.classList.add('am-legacy-bars');
+    // لو المتصفح بيعرف ارتفاع الشريط نستخدمه، وإلا 36
+    var probe = document.createElement('div'); probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;';
+    var put = function(){ try { (document.body || de).appendChild(probe); var h = probe.getBoundingClientRect().height; probe.remove(); if (h > 12 && h < 90) de.style.setProperty('--am-top', Math.round(h) + 'px'); } catch (e) {} };
+    if (document.body) put(); else document.addEventListener('DOMContentLoaded', put);
+  } catch (e) {}
+})();
 // تنضيف مرة واحدة: النسخ القديمة من غير بادئة — بس لو السيستم مش مفتوح على نفس المتصفح (عشان منمسحش حاجته)
 (function(){ try {
   if (localStorage.getItem('am_cleaned_v1')) return;
