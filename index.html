@@ -274,6 +274,21 @@
   body.rep-ui .delivery-status-chip{font-weight:600;font-size:10.5px;border-radius:6px;}
   body.rep-ui .rep-empty p{font-weight:500;font-size:12px;}
   body.rep-ui .modal-sheet{background:#FBF5EC;}
+  /* (2026-11-13) صفحات المندوب بشريط تحت زي أبليكشن العميل */
+  .rp-page{display:none;}
+  .rp-page.active{display:block;}
+  #repHomeScreen,#deliveryHomeScreen{padding-bottom:86px;}
+  .rp-title{font-size:16px;font-weight:700;color:var(--ink);margin:18px 16px 12px;display:flex;align-items:center;gap:8px;}
+  .rp-title i{color:var(--maroon);font-size:15px;}
+  .rp-chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;}
+  .rp-chips button{flex-shrink:0;padding:8px 12px;border-radius:99px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;}
+  .rp-chips button.on{background:var(--maroon);color:#fff;border-color:var(--maroon);}
+  .rp-chips button b{margin-right:4px;}
+  #repNav .nav-btn{position:relative;}
+  #repNav .rp-badge{position:absolute;top:4px;right:calc(50% - 22px);min-width:17px;height:17px;border-radius:99px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+  .fu-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:8px;}
+  .fu-actions{display:flex;gap:6px;margin-top:10px;}
+  .fu-actions a,.fu-actions button{flex:1;text-align:center;padding:8px 6px;border-radius:10px;font-size:12px;font-weight:600;text-decoration:none;}
   .dlv-pill{display:inline-flex;align-items:center;gap:5px;padding:8px 12px;border-radius:10px;background:#F7E9E6;color:var(--maroon);font-size:12px;font-weight:600;text-decoration:none;}
   .dlv-pill.call{background:#E8F3EB;color:var(--success);}
   .rep-sec{font-size:12.5px;font-weight:700;color:var(--ink);margin:20px 16px 8px;display:flex;align-items:center;gap:7px;}
@@ -503,6 +518,7 @@
   </div>
 
   <div id="repHomeScreen" class="screen">
+   <div class="rp-page active" data-p="today">
     <div id="repDiagBox" style="display:none;margin:12px 16px 0;padding:12px;border-radius:14px;background:#fde8e8;color:#8a1c1c;font-size:11px;line-height:1.8;font-weight:700;"></div>
     <div class="welcome-card">
       <div class="welcome-row">
@@ -512,7 +528,6 @@
           <div class="welcome-name" id="repWelcomeName">-</div>
         </div>
         <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
-        <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="repStatVisits">0</b><span>زيارات النهاردة</span></div>
@@ -520,30 +535,46 @@
         <div class="rep-stat"><b id="repStatLast">-</b><span>آخر نشاط</span></div>
       </div>
     </div>
-
     <div id="repDayCard" style="margin:14px 16px 0;"></div>
-    <div id="repOutboxBox" style="display:none;margin:12px 16px 0;padding:10px 12px;border-radius:12px;background:#fff3df;color:#8a5a00;font-size:11px;font-weight:800;"></div>
+    <div id="repFollowSummary" style="margin:14px 16px 0;"></div>
     <div id="repRouteCard" style="margin:14px 16px 0;"></div>
-    <div style="margin:16px 16px 0;">
+    <div id="repProgressCard" style="margin:14px 16px 0;"></div>
+   </div>
+
+   <div class="rp-page" data-p="customers">
+    <div class="rp-title"><i class="fas fa-users"></i> عملائي</div>
+    <div style="margin:0 16px;">
       <button onclick="openRepNewCustomer()" style="width:100%;margin-bottom:12px;padding:11px;border-radius:12px;border:1px dashed #c9a98a;background:#fff;color:var(--maroon);font-size:12.5px;font-weight:600;"><i class="fas fa-user-plus"></i> محل جديد مش متسجل؟ ضيفه</button>
+      <div id="repFollowChips" class="rp-chips"></div>
       <div class="rep-field">
-        <label>اختر التاجر</label>
         <div class="rep-input-wrap">
           <input type="text" id="repClientSearch" placeholder="اكتب اسم التاجر أو رقم الهاتف..." oninput="renderRepClientResults()">
           <i class="fas fa-magnifying-glass"></i>
         </div>
       </div>
-      <div id="repClientResults" style="max-height:260px;overflow-y:auto;"></div>
+      <div id="repClientResults"></div>
     </div>
+   </div>
 
-    <div id="repProgressCard" style="margin:16px 16px 0;"></div>
-    <div class="rep-sec"><i class="fas fa-receipt"></i> طلباتي</div>
+   <div class="rp-page" data-p="orders">
+    <div class="rp-title"><i class="fas fa-receipt"></i> طلباتي</div>
+    <div id="repOutboxBox" style="display:none;margin:0 16px 12px;padding:10px 12px;border-radius:12px;background:#fff3df;color:#8a5a00;font-size:11px;font-weight:800;"></div>
     <div id="repOrdersList" style="margin:0 16px;"></div>
-    <div class="rep-sec"><i class="fas fa-route"></i> آخر زياراتي</div>
-    <div id="repVisitsList" style="margin:0 16px 24px;"></div>
+   </div>
+
+   <div class="rp-page" data-p="visits">
+    <div class="rp-title"><i class="fas fa-route"></i> زياراتي</div>
+    <div id="repVisitsList" style="margin:0 16px;"></div>
+   </div>
+
+   <div class="rp-page" data-p="account">
+    <div class="rp-title"><i class="fas fa-user"></i> حسابي</div>
+    <div id="repAccountBox" style="margin:0 16px;"></div>
+   </div>
   </div>
 
   <div id="deliveryHomeScreen" class="screen">
+   <div class="rp-page active" data-p="deliver">
     <div class="welcome-card">
       <div class="welcome-row">
         <div class="avatar-badge"><i class="fas fa-truck" style="font-size:15px;"></i></div>
@@ -552,7 +583,6 @@
           <div class="welcome-name" id="deliveryWelcomeName">-</div>
         </div>
         <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
-        <button onclick="repLogout()" style="background:rgba(255,255,255,0.15);border-radius:10px;padding:6px 10px;font-size:10.5px;font-weight:800;color:#fff;"><i class="fas fa-arrow-right-from-bracket"></i> خروج</button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="deliveryStatPending">0</b><span>بانتظار التسليم</span></div>
@@ -561,10 +591,18 @@
         <div class="rep-stat"><b id="deliveryStatReturns">0</b><span>مرتجع معاك</span></div>
       </div>
       <div id="deliveryShortageLine" style="display:none;margin-top:10px;background:rgba(255,255,255,0.18);color:#fff;border-radius:12px;padding:8px;font-size:11.5px;text-align:center;"></div>
-      <button onclick="openDeliveryDayReport()" style="margin-top:10px;width:100%;background:rgba(255,255,255,0.15);color:#fff;border-radius:12px;padding:9px;font-size:11.5px;font-weight:900;"><i class="fas fa-clipboard-list"></i> تقرير اليوم: الفلوس والمرتجع</button>
     </div>
     <div class="rep-sec"><i class="fas fa-truck"></i> فواتير جاهزة للتسليم</div>
     <div id="deliveryInvoicesList" style="margin:0 16px 24px;"></div>
+     </div>
+   <div class="rp-page" data-p="report">
+    <div class="rp-title"><i class="fas fa-clipboard-list"></i> فلوسي والمرتجع</div>
+    <div id="deliveryReportPage" style="margin:0 16px;"></div>
+   </div>
+   <div class="rp-page" data-p="account">
+    <div class="rp-title"><i class="fas fa-user"></i> حسابي</div>
+    <div id="deliveryAccountBox" style="margin:0 16px;"></div>
+   </div>
   </div>
 
   <div id="homeScreen" class="screen active">
@@ -759,6 +797,7 @@
     </button>
     <button class="nav-btn" id="navAccount" onclick="switchTopTab('account')"><i class="fas fa-user"></i><span>حسابي</span></button>
   </div>
+  <div class="bottom-nav" id="repNav" style="display:none;"></div>
 </div>
 
 <div class="modal-overlay" id="repClientActionsModal">
@@ -934,7 +973,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-13-1';
+  var APP_BUILD = '2026-11-13-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1722,7 +1761,7 @@ function renderRepHome(){
   document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
   renderRepClientResults();
   renderRepVisitsList();
-  try { renderRepDayCard(); renderRepRoute(); renderRepOutboxBadge(); } catch (e) { console.error(e); }
+  try { renderRepDayCard(); renderRepFollowSummary(); renderRepRoute(); renderRepOutboxBadge(); renderRepNav(); if (repPage.sales === 'account') renderRepAccount(); } catch (e) { console.error(e); }
   if (!repMyPos) repRefreshPos(function(){ try { renderRepRoute(); } catch (e) {} });
   setTimeout(function(){ try { replayRepOutbox(); } catch (e) {} }, 2000);
 }
@@ -2157,6 +2196,131 @@ function renderRepCheckinBar(c){
   }
 }
 
+// ==================== (2026-11-13) صفحات المندوب (شريط تحت) + عملاء محتاجين متابعة ====================
+var REP_PAGES = {
+  sales: [['today', 'fa-house', 'النهارده'], ['customers', 'fa-users', 'العملاء'], ['orders', 'fa-receipt', 'طلباتي'], ['visits', 'fa-route', 'زياراتي'], ['account', 'fa-user', 'حسابي']],
+  delivery: [['deliver', 'fa-truck', 'التسليم'], ['report', 'fa-wallet', 'فلوسي والمرتجع'], ['account', 'fa-user', 'حسابي']]
+};
+var repPage = { sales: 'today', delivery: 'deliver' };
+function repKind(){ return currentRep && currentRep.type === 'delivery' ? 'delivery' : 'sales'; }
+function repScreenEl(){ return document.getElementById(repKind() === 'delivery' ? 'deliveryHomeScreen' : 'repHomeScreen'); }
+function setRepPage(p){
+  var k = repKind(); repPage[k] = p;
+  var el = repScreenEl(); if (!el) return;
+  el.querySelectorAll('.rp-page').forEach(function(x){ x.classList.toggle('active', x.getAttribute('data-p') === p); });
+  window.scrollTo(0, 0);
+  renderRepNav();
+  try {
+    if (k === 'sales') { if (p === 'customers') renderRepClientResults(); if (p === 'account') renderRepAccount(); if (p === 'visits') renderRepVisitsList(); if (p === 'orders') { renderRepOrdersList(); renderRepOutboxBadge(); } }
+    else { if (p === 'report') renderDeliveryReportPage(); if (p === 'account') renderDeliveryAccount(); }
+  } catch (e) { console.error(e); }
+}
+function repNavBadges(){
+  var b = {};
+  try {
+    if (repKind() === 'sales') {
+      var L = repFollowLists(); var n = L.opened.length + L.lapsed.length; if (n) b.customers = n;
+      var ob = repOutbox().length; if (ob) b.orders = ob;
+    } else {
+      var pend = deliveryInvoices.filter(function(o){ return !o.repDelivery && deliveryOwnership(o) === 'mine'; }).length; if (pend) b.deliver = pend;
+      var rets = myRepReturns.filter(function(o){ return o.repReturnPending; }).length; if (rets) b.report = rets;
+    }
+  } catch (e) {}
+  return b;
+}
+function renderRepNav(){
+  var nav = document.getElementById('repNav'); if (!nav || !currentRep) return;
+  var k = repKind(), cur = repPage[k], bd = repNavBadges();
+  nav.innerHTML = REP_PAGES[k].map(function(x){
+    return '<button class="nav-btn' + (x[0] === cur ? ' active' : '') + '" onclick="setRepPage(&#39;' + x[0] + '&#39;)"><i class="fas ' + x[1] + '"></i>' + (bd[x[0]] ? '<span class="rp-badge">' + bd[x[0]] + '</span>' : '') + '<span>' + x[2] + '</span></button>';
+  }).join('');
+}
+function syncRepNav(screenName){
+  var nav = document.getElementById('repNav'); if (!nav) return;
+  var on = !!(repMode && currentRep && (screenName === 'repHome' || screenName === 'deliveryHome'));
+  nav.style.display = on ? 'flex' : 'none';
+  if (on) { var bn = document.querySelector('.bottom-nav:not(#repNav)'); if (bn) bn.style.display = 'none'; renderRepNav(); }
+}
+function renderRepAccount(){
+  var box = document.getElementById('repAccountBox'); if (!box || !currentRep) return;
+  var mk = repMonthKey(new Date()), me = (repProgressDoc && repProgressDoc.reps && repProgressDoc.reps[currentRep.code]) || {};
+  var tgt = Number(((repSalesTargets || {})[mk] || {})[currentRep.code]) || 0;
+  box.innerHTML = '<div class="fu-card" style="display:flex;align-items:center;gap:12px;"><div class="client-avatar" style="background:var(--maroon);width:48px;height:48px;font-size:18px;border-radius:14px;">' + avatarInitial(currentRep.name || 'م') + '</div><div><div style="font-size:15px;font-weight:700;">' + repEsc(currentRep.name || '') + '</div><div style="font-size:12px;color:var(--muted);">مندوب مبيعات · كود ' + repEsc(currentRep.code) + '</div></div></div>' +
+    '<div class="rep-tiles"><div class="rep-tile"><span>مبيعات الشهر</span><b>' + money(Math.round(me.month || 0)) + ' <small>ج</small></b><em>' + (tgt ? 'من تارجت ' + money(tgt) : '&nbsp;') + '</em></div><div class="rep-tile"><span>مبيعات النهارده</span><b>' + money(Math.round(me.today || 0)) + ' <small>ج</small></b><em>&nbsp;</em></div></div>' +
+    (repRankText() ? '<div class="fu-card" style="font-size:13px;">' + repRankText() + '</div>' : '') +
+    '<button onclick="openNotifInbox()" class="rep-action-btn"><div class="rep-action-icon" style="background:#F7E9E6;color:var(--maroon);"><i class="fas fa-bell"></i></div><div><div class="rep-action-title">الإشعارات</div></div><i class="fas fa-chevron-left rep-action-chev"></i></button>' +
+    '<button onclick="if(confirm(\'تسجيل الخروج من حساب المندوب؟\'))repLogout()" class="rep-action-btn"><div class="rep-action-icon" style="background:#FBE9E7;color:var(--danger);"><i class="fas fa-arrow-right-from-bracket"></i></div><div><div class="rep-action-title" style="color:var(--danger);">تسجيل الخروج</div></div></button>';
+}
+function renderDeliveryAccount(){
+  var box = document.getElementById('deliveryAccountBox'); if (!box || !currentRep) return;
+  box.innerHTML = '<div class="fu-card" style="display:flex;align-items:center;gap:12px;"><div class="client-avatar" style="background:var(--maroon);width:48px;height:48px;font-size:18px;border-radius:14px;"><i class="fas fa-truck"></i></div><div><div style="font-size:15px;font-weight:700;">' + repEsc(currentRep.name || '') + '</div><div style="font-size:12px;color:var(--muted);">مندوب تسليم · كود ' + repEsc(currentRep.code) + '</div></div></div>' +
+    '<button onclick="openNotifInbox()" class="rep-action-btn"><div class="rep-action-icon" style="background:#F7E9E6;color:var(--maroon);"><i class="fas fa-bell"></i></div><div><div class="rep-action-title">الإشعارات</div></div><i class="fas fa-chevron-left rep-action-chev"></i></button>' +
+    '<button onclick="if(confirm(\'تسجيل الخروج من حساب المندوب؟\'))repLogout()" class="rep-action-btn"><div class="rep-action-icon" style="background:#FBE9E7;color:var(--danger);"><i class="fas fa-arrow-right-from-bracket"></i></div><div><div class="rep-action-title" style="color:var(--danger);">تسجيل الخروج</div></div></button>';
+}
+function renderDeliveryReportPage(){
+  var box = document.getElementById('deliveryReportPage'); if (!box) return;
+  box.innerHTML = buildDeliveryDayReportHtml();
+}
+// ---------- عملاء محتاجين متابعة ----------
+var FU_DEF = { opened: ['👀', 'فتحوا الأبليكشن وما طلبوش'], once: ['1️⃣', 'طلبوا مرة واحدة الشهر ده'], lapsed: ['😴', 'بطّلوا الشهر ده'] };
+var repFollowMode = '';
+function repFollowLists(){
+  var out = { opened: [], once: [], lapsed: [] }; if (!currentRep || repKind() !== 'sales') return out;
+  var now = Date.now(), mStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  var fus = repVisits.filter(function(v){ return v.kind === 'followUp' && v.repUsername === currentRep.code; });
+  myRepCustomers().forEach(function(c){
+    var s = repCustStats(c.code); if (!s) return;
+    var l = (s.l || 0) * 1000, o = (s.o || 0) * 1000;
+    var doneAfter = function(t){ return fus.some(function(f){ return String(f.customerCode) === String(c.code) && new Date(f.date).getTime() > t; }); };
+    if (o && now - o < 3 * 86400000 && l < o && !doneAfter(o)) out.opened.push({ c: c, s: s, why: 'فتح الأبليكشن ' + timeAgoAr(new Date(o).toISOString()) + ' وما طلبش' });
+    if (s.m === 1 && !doneAfter(Math.max(l, mStart))) out.once.push({ c: c, s: s, why: 'طلب مرة واحدة الشهر ده (' + new Date(l).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) + ')' });
+    if ((s.pm || 0) >= 1 && !s.m && !doneAfter(mStart)) out.lapsed.push({ c: c, s: s, why: 'الشهر اللي فات طلب ' + s.pm + ' مرة · الشهر ده ولا مرة' + (l ? ' · آخر طلب ' + new Date(l).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) : '') });
+  });
+  return out;
+}
+function renderRepFollowSummary(){
+  var box = document.getElementById('repFollowSummary'); if (!box) return;
+  var L = repFollowLists(), tot = L.opened.length + L.once.length + L.lapsed.length;
+  if (!tot) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="fu-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px;"><i class="fas fa-user-clock" style="color:var(--maroon);"></i> عملاء محتاجين متابعة</div><div style="display:flex;gap:6px;">' +
+    Object.keys(FU_DEF).map(function(k){ return '<button onclick="repFollowMode=&#39;' + k + '&#39;;setRepPage(&#39;customers&#39;)" style="flex:1;background:var(--cream);border-radius:10px;padding:8px 4px;text-align:center;"><div style="font-size:17px;font-weight:700;">' + L[k].length + '</div><div style="font-size:10.5px;color:var(--muted);">' + FU_DEF[k][0] + ' ' + FU_DEF[k][1] + '</div></button>'; }).join('') + '</div></div>';
+}
+function renderRepFollowChips(L){
+  var box = document.getElementById('repFollowChips'); if (!box) return;
+  box.innerHTML = '<button class="' + (!repFollowMode ? 'on' : '') + '" onclick="repFollowMode=&#39;&#39;;renderRepClientResults()">كل العملاء</button>' +
+    Object.keys(FU_DEF).map(function(k){ return '<button class="' + (repFollowMode === k ? 'on' : '') + '" onclick="repFollowMode=&#39;' + k + '&#39;;renderRepClientResults()">' + FU_DEF[k][0] + ' ' + FU_DEF[k][1] + '<b>' + L[k].length + '</b></button>'; }).join('');
+}
+function renderRepFollowList(list){
+  var wrap = document.getElementById('repClientResults');
+  if (!list.length) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-check-circle"></i><p>مفيش عملاء هنا دلوقتي 👍</p></div>'; return; }
+  wrap.innerHTML = list.map(function(x){
+    var c = x.c, ph = digitsOnly(c.phone || ''), wa = ph ? 'https://wa.me/2' + (ph.length === 10 ? '0' + ph : ph) : '';
+    var code = String(c.code).replace(/'/g, "\\'");
+    return '<div class="fu-card"><div style="display:flex;align-items:center;gap:10px;"><div class="client-avatar" style="background:' + avatarColor(c.code) + ';">' + avatarInitial(c.name || c.code) + '</div><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">' + repEsc(c.shopName || c.name) + '</div><div style="font-size:12px;color:var(--muted);">' + repEsc(c.shopName ? c.name : (c.address || '')) + '</div></div></div>' +
+      '<div style="font-size:12px;color:#9A5B00;background:#FFF1DC;border-radius:8px;padding:6px 9px;margin-top:8px;">' + repEsc(x.why) + '</div>' +
+      '<div class="fu-actions">' + (ph ? '<a href="tel:' + c.phone + '" style="background:#E8F3EB;color:var(--success);"><i class="fas fa-phone"></i> اتصال</a><a href="' + wa + '" target="_blank" rel="noopener" style="background:#E7F8EE;color:#128C4A;"><i class="fab fa-whatsapp"></i> واتساب</a>' : '') +
+      '<button onclick="openRepClientActions(&#39;' + code + '&#39;)" style="background:var(--cream);color:var(--maroon);">الكارت</button><button onclick="openRepFollowDone(&#39;' + code + '&#39;)" style="background:var(--maroon);color:#fff;">اتابعت ✓</button></div></div>';
+  }).join('');
+}
+function openRepFollowDone(code){
+  var c = allCustomers.find(function(x){ return String(x.code) === String(code); }); if (!c) return;
+  var ov = document.getElementById('repFuOverlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'repFuOverlay'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99995;display:flex;align-items:flex-end;justify-content:center;'; document.body.appendChild(ov); }
+  ov.style.display = 'flex';
+  ov.innerHTML = '<div style="background:#FBF5EC;border-radius:20px 20px 0 0;padding:18px 16px 28px;width:100%;max-width:480px;"><div style="font-size:15px;font-weight:700;margin-bottom:4px;">نتيجة المتابعة</div><div style="font-size:12px;color:var(--muted);margin-bottom:12px;">' + repEsc(c.shopName || c.name) + '</div>' +
+    [['ordered', '🛒 طلب / هيطلب دلوقتي'], ['later', '⏳ هيطلب بعدين'], ['no', '✋ مش عايز']].map(function(r){ return '<button onclick="saveRepFollow(&#39;' + String(code).replace(/'/g, "\\'") + '&#39;,&#39;' + r[0] + '&#39;)" class="rep-action-btn" style="justify-content:flex-start;"><div class="rep-action-title">' + r[1] + '</div></button>'; }).join('') +
+    '<input id="repFuNote" class="form-input" placeholder="ملاحظة (اختياري) — مثلًا السبب" style="margin-top:4px;"><button onclick="document.getElementById(&#39;repFuOverlay&#39;).style.display=&#39;none&#39;" style="width:100%;margin-top:10px;padding:10px;color:var(--muted);font-size:12.5px;">إلغاء</button></div>';
+}
+function saveRepFollow(code, result){
+  var c = allCustomers.find(function(x){ return String(x.code) === String(code); }); if (!c || !currentRep) return;
+  var L = repFollowLists(), lists = Object.keys(L).filter(function(k){ return L[k].some(function(x){ return String(x.c.code) === String(code); }); });
+  recordRepVisit({ id: 'fu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), kind: 'followUp', date: new Date().toISOString(), repUsername: currentRep.code, repFullName: currentRep.name || '',
+    customerCode: c.code, customerName: c.shopName || c.name || '', lists: lists, result: result, note: ((document.getElementById('repFuNote') || {}).value || '').trim() });
+  document.getElementById('repFuOverlay').style.display = 'none';
+  showToast('اتسجلت المتابعة ✓');
+  renderRepClientResults(); renderRepFollowSummary(); renderRepNav();
+}
+
 function lastVisitFor(code){
   return repVisits.find(function(v){ return !v.kind && !v.auto && String(v.customerCode) === String(code); });
 }
@@ -2164,6 +2328,13 @@ var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
 
 function renderRepClientResults(){
+  var FL = repFollowLists();
+  try { renderRepFollowChips(FL); } catch (e) {}
+  if (repFollowMode && FL[repFollowMode]) {
+    var qq = (document.getElementById('repClientSearch').value || '').trim();
+    renderRepFollowList(FL[repFollowMode].filter(function(x){ return !qq || [x.c.name, x.c.shopName, x.c.phone].join(' ').indexOf(qq) !== -1; }));
+    return;
+  }
   var qRaw = (document.getElementById('repClientSearch').value || '').trim();
   var q = qRaw.replace(/[٠-٩]/g, function(d){ return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); }).replace(/[۰-۹]/g, function(d){ return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).toLowerCase();
   var qDigits = digitsOnly(q);
@@ -2444,7 +2615,7 @@ function renderRepProgress(){
 function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto && (!v.kind || v.kind === 'newCustomer'); }).slice(0, 20);
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto && (!v.kind || v.kind === 'newCustomer'); }).slice(0, 60);
   // (2026-11-06) طلبات العملاء الجداد بتظهر هنا بحالتها
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
@@ -2601,6 +2772,7 @@ function renderDeliveryHome(){
   if (shEl) { var h = myShortageHtml(); shEl.innerHTML = h; shEl.style.display = h ? 'block' : 'none'; }
   try { if (document.getElementById('deliveryInvoiceModal').classList.contains('show')) renderDeliveryInvoice(); } catch (e) {}
   renderDeliveryInvoicesList();
+  try { renderRepNav(); if (repPage.delivery === 'report') renderDeliveryReportPage(); if (repPage.delivery === 'account') renderDeliveryAccount(); } catch (e) {}
 }
 
 function renderDeliveryInvoicesList(){
@@ -2944,6 +3116,10 @@ function confirmDeliveryWithReturns(){
 // تقرير آخر اليوم: التحصيل + المرتجع
 function isTodayTs(ts){ return inCurrentSalesDay(ts); }   // يوم البيع (9 الصبح لـ 9 الصبح)
 function openDeliveryDayReport(){
+  document.getElementById('deliveryDayReportBody').innerHTML = buildDeliveryDayReportHtml();
+  openModalOverlay('deliveryDayReportModal');
+}
+function buildDeliveryDayReportHtml(){
   var money0 = deliveryHistoryInvoices.filter(function(r){ return r.date && inCurrentSalesDay(r.date); });
   var unsettled = myUnsettledRecords();
   var oldUnsettled = unsettled.filter(function(r){ return !inCurrentSalesDay(r.date); });
@@ -2958,7 +3134,7 @@ function openDeliveryDayReport(){
   var row = function(a, b, c){ return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 0;border-bottom:1px dashed var(--border);"><span>' + a + '</span><span style="color:var(--muted);">' + (c || '') + '</span><b>' + b + '</b></div>'; };
   var dayFrom = new Date(salesDayStartTs());
   var sh = myShortageHtml();
-  document.getElementById('deliveryDayReportBody').innerHTML =
+  return '' +
     '<div style="font-size:10.5px;color:var(--muted);margin-bottom:8px;text-align:center;">يوم البيع من ' + dayFrom.toLocaleDateString(repLoc()) + ' الساعة 9 الصبح لحد 9 الصبح اليوم اللي بعده</div>' +
     '<div style="display:flex;gap:8px;"><div style="flex:1;background:#E1F5EE;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">فلوس معاك (لسه ماسلّمتهاش)</div><b style="font-size:15px;">' + money(totalWithMe) + ' ج</b></div>' +
     '<div style="flex:1;background:#FFF4E5;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:10px;">مرتجع معاك</div><b style="font-size:15px;color:var(--danger);">' + money(totalRet) + ' ج</b></div></div>' +
@@ -2969,7 +3145,6 @@ function openDeliveryDayReport(){
     (rets.length ? sec('المرتجع حسب العميل') + rets.map(function(o){ return '<div style="font-size:11.5px;padding:6px 0;border-bottom:1px dashed var(--border);"><div style="display:flex;justify-content:space-between;"><b>' + (o.customerName || '') + (o.repReturnKind === 'full' ? ' <span style="color:var(--danger);font-size:10px;">(الطلب كله)</span>' : '') + '</b><b style="color:var(--danger);">' + money(o.repReturnValue) + ' ج</b></div>' +
       (o.repReturns || []).concat(o.prevReturns || []).map(function(r){ return '<div style="color:var(--muted);font-size:10.5px;">• ' + r.productName + ' × ' + r.qty + ' ' + (r.unit || '') + ' — ' + r.reason + (r.prev ? ' <b style="color:var(--maroon);">(من طلب قديم)</b>' : '') + '</div>'; }).join('') +
       '<div style="font-size:10px;margin-top:2px;color:' + (o.repReturnPending ? 'var(--danger)' : 'var(--success)') + ';">' + (o.repReturnPending ? 'لسه معاك — سلّمه للمخزن' : '✓ اتسلّم للمخزن') + '</div></div>'; }).join('') : '');
-  openModalOverlay('deliveryDayReportModal');
 }
 
 function openDeliveryRejectModal(orderId){
@@ -3458,6 +3633,7 @@ function switchScreenRaw(name){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById(name + 'Screen').classList.add('active');
   window.scrollTo(0,0);
+  try { syncRepNav(name); } catch (e) {}
 }
 function switchScreen(name){
   if (repMode && name === 'home' && !repTargetCustomer) { switchScreenRaw('repHome'); renderRepHome(); pushOrReplaceScreenNav('repHome', 'switchScreen'); return; }
