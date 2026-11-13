@@ -521,6 +521,7 @@
       </div>
     </div>
 
+    <div id="repDayCard" style="margin:14px 16px 0;"></div>
     <div id="repOutboxBox" style="display:none;margin:12px 16px 0;padding:10px 12px;border-radius:12px;background:#fff3df;color:#8a5a00;font-size:11px;font-weight:800;"></div>
     <div id="repRouteCard" style="margin:14px 16px 0;"></div>
     <div style="margin:16px 16px 0;">
@@ -773,6 +774,7 @@
       <a class="client-call-btn" id="repClientActionsCallBtn" href="#" style="display:none;width:40px;height:40px;border-radius:12px;font-size:16px;"><i class="fas fa-phone"></i></a>
       <button onclick="closeModalOverlay('repClientActionsModal')" style="width:34px;height:34px;"><i class="fas fa-xmark" style="color:#8a7460;font-size:16px;"></i></button>
     </div>
+    <div id="repCheckinBar"></div>
     <div id="repClientNavBtn"></div>
     <div id="repClientInsights"></div>
     <button class="rep-action-btn main" onclick="startRepOrderFlow()">
@@ -932,7 +934,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-07-1';
+  var APP_BUILD = '2026-11-13-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1712,7 +1714,7 @@ function renderRepHome(){
   document.getElementById('repClientSearch').value = '';
   renderRepProgress();
   renderRepOrdersList();
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && v.kind !== 'newCustomer' && v.kind !== 'locationChange' && !v.auto; });
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.kind && !v.auto; });
   var todayVisits = mine.filter(function(v){ return inCurrentSalesDay(v.date); });   // يوم البيع (9 الصبح لـ 9 الصبح)
   repClientLimit = 40;
   document.getElementById('repStatVisits').textContent = todayVisits.length;
@@ -1720,7 +1722,7 @@ function renderRepHome(){
   document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
   renderRepClientResults();
   renderRepVisitsList();
-  try { renderRepRoute(); renderRepOutboxBadge(); } catch (e) { console.error(e); }
+  try { renderRepDayCard(); renderRepRoute(); renderRepOutboxBadge(); } catch (e) { console.error(e); }
   if (!repMyPos) repRefreshPos(function(){ try { renderRepRoute(); } catch (e) {} });
   setTimeout(function(){ try { replayRepOutbox(); } catch (e) {} }, 2000);
 }
@@ -1750,8 +1752,9 @@ function repRefreshPos(cb){
 // ---------- 1) خط سير النهارده ----------
 function repTodayRoute(){
   var wd = salesWeekdayNow(), dayStart = salesDayStartMs(Date.now());
+  var usePlan = repHasPlan(), pwd = planWeekdayNow();
   var visitedToday = {}, orderedToday = {};
-  repVisits.forEach(function(v){ if (v.kind === 'newCustomer' || v.kind === 'locationChange') return; if (inCurrentSalesDay(v.date)) { if (v.orderId) orderedToday[String(v.customerCode)] = true; if (!v.auto) visitedToday[String(v.customerCode)] = true; } });
+  repVisits.forEach(function(v){ if (v.kind) return; if (inCurrentSalesDay(v.date)) { if (v.orderId) orderedToday[String(v.customerCode)] = true; if (!v.auto) visitedToday[String(v.customerCode)] = true; } });
   (repMyOrders || []).forEach(function(o){ if ((o.createdAt || 0) >= dayStart) orderedToday[String(o.customerCode)] = true; });
   var out = [];
   myRepCustomers().forEach(function(c){
@@ -1759,7 +1762,8 @@ function repTodayRoute(){
     if ((s.l || 0) * 1000 >= dayStart) orderedToday[String(c.code)] = true;
     var days = s.l ? Math.floor((Date.now() - s.l * 1000) / 86400000) : null;
     var why = '';
-    if (s.u === wd) why = 'يومه المعتاد (' + WD_AR[wd] + ')';
+    if (usePlan) { if (Array.isArray(c.visitDays) && c.visitDays.indexOf(pwd) !== -1) why = 'في خط سير ' + WD_AR[pwd] + (days != null ? ' · آخر طلب من ' + days + ' يوم' : ''); }
+    else if (s.u === wd) why = 'يومه المعتاد (' + WD_AR[wd] + ')';
     else if (days != null && days >= 7) why = 'مطلبش من ' + days + ' يوم';
     if (!why) return;
     var st = orderedToday[String(c.code)] ? 'ordered' : (visitedToday[String(c.code)] ? 'visited' : 'todo');
@@ -2068,8 +2072,93 @@ function repRankText(){
   return '<div style="font-size:10.5px;margin-top:4px;">ترتيبك بين المناديب الشهر ده: <b>' + (i === 0 ? '🥇 الأول' : (i === 1 ? '🥈 التاني' : (i === 2 ? '🥉 التالت' : '#' + (i + 1)))) + '</b> من ' + arr.length + (i > 0 ? ' — فاضلك ' + money(arr[i - 1].v - arr[i].v) + ' ج وتعدّي اللي قبلك' : '') + '</div>';
 }
 
+// ==================== (2026-11-13) تنظيم يوم المندوب ====================
+// 1) بداية ونهاية اليوم (بالوقت والموقع)  2) خط سير ثابت لكل يوم في الأسبوع (من السيستم: customer.visitDays)
+// 3) مدة الزيارة: "وصلت" ← "تسجيل الزيارة" = مدة القعدة عند العميل
+// بيتسجلوا في customerVisitRecords بنوع (kind) مختلف: dayStart / dayEnd — ومش بيتحسبوا زيارات
+function workDayKey(ms){ var d = new Date((ms || Date.now()) - 4 * 3600000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function planWeekdayNow(){ return new Date(Date.now() - 4 * 3600000).getDay(); }
+function repDayRec(kind){ var k = workDayKey(); return repVisits.find(function(v){ return v.kind === kind && v.repUsername === (currentRep && currentRep.code) && v.dayKey === k; }); }
+function repDayStarted(){ return !!repDayRec('dayStart'); }
+function repDayEnded(){ return !!repDayRec('dayEnd'); }
+function repTodayRealVisits(){ return repVisits.filter(function(v){ return !v.kind && !v.auto && currentRep && v.repUsername === currentRep.code && workDayKey(new Date(v.date).getTime()) === workDayKey(); }); }
+function repStartDay(after){
+  if (!currentRep) return;
+  if (repDayStarted()) { if (after) after(); return; }
+  if (amIsMock() === true) { alert('⚠ الموبايل شغال عليه برنامج بيغيّر الموقع (Fake GPS) — اقفله الأول.'); return; }
+  showToast('بيحدد موقعك...');
+  repQuickPos(8000).then(function(p){
+    var rec = { id: 'ds-' + currentRep.code + '-' + workDayKey() + '-' + Date.now(), kind: 'dayStart', dayKey: workDayKey(), date: new Date().toISOString(), repUsername: currentRep.code, repFullName: currentRep.name || '',
+      repLocation: p ? { lat: p.lat, lng: p.lng, acc: p.acc } : null, mock: amIsMock() };
+    recordRepVisit(rec);
+    showToast('صباح الخير ☀️ يومك بدأ الساعة ' + new Date().toLocaleTimeString(repLoc(), { hour: 'numeric', minute: '2-digit' }));
+    renderRepHome();
+    if (after) setTimeout(after, 300);
+  });
+}
+function repEndDay(){
+  if (!currentRep || !repDayStarted() || repDayEnded()) return;
+  var vs = repTodayRealVisits(), ok = vs.filter(function(v){ return v.status === 'ناجحة'; }).length;
+  var orders = (repMyOrders || []).filter(function(o){ return workDayKey(o.createdAt || 0) === workDayKey(); });
+  var plan = repPlanToday(), planDone = plan.filter(function(c){ return vs.some(function(v){ return String(v.customerCode) === String(c.code); }); }).length;
+  if (!confirm('تقفل يومك؟\n\nزيارات: ' + vs.length + ' (ناجحة ' + ok + ')\nطلبات: ' + orders.length + (plan.length ? '\nخط السير: زرت ' + planDone + ' من ' + plan.length : ''))) return;
+  repQuickPos(8000).then(function(p){
+    var st = repDayRec('dayStart');
+    var rec = { id: 'de-' + currentRep.code + '-' + workDayKey() + '-' + Date.now(), kind: 'dayEnd', dayKey: workDayKey(), date: new Date().toISOString(), repUsername: currentRep.code, repFullName: currentRep.name || '',
+      repLocation: p ? { lat: p.lat, lng: p.lng, acc: p.acc } : null, mock: amIsMock(),
+      summary: { visits: vs.length, ok: ok, orders: orders.length, sales: Math.round(orders.reduce(function(a, o){ return a + (Number(o.total) || 0); }, 0)), planned: plan.length, plannedVisited: planDone,
+        workMin: st ? Math.round((Date.now() - new Date(st.date).getTime()) / 60000) : null } };
+    recordRepVisit(rec);
+    showToast('يومك اتقفل ✓ تسلم إيدك');
+    renderRepHome();
+  });
+}
+function renderRepDayCard(){
+  var box = document.getElementById('repDayCard'); if (!box) return;
+  if (!currentRep || currentRep.type !== 'sales') { box.innerHTML = ''; return; }
+  var st = repDayRec('dayStart'), en = repDayRec('dayEnd');
+  var t = function(v){ return new Date(v.date).toLocaleTimeString(repLoc(), { hour: 'numeric', minute: '2-digit' }); };
+  if (!st) {
+    box.innerHTML = '<button onclick="repStartDay()" style="width:100%;padding:14px;border-radius:14px;background:var(--success);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;"><i class="fas fa-play"></i> ابدأ يومك</button>' +
+      '<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">لازم تبدأ يومك قبل ما تسجل زيارات — بيتسجل الوقت والمكان</div>';
+    return;
+  }
+  var mins = Math.round(((en ? new Date(en.date).getTime() : Date.now()) - new Date(st.date).getTime()) / 60000);
+  var dur = Math.floor(mins / 60) + ' س ' + (mins % 60) + ' د';
+  box.innerHTML = '<div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px 12px;">' +
+    '<div style="flex:1;font-size:12px;"><div style="font-weight:700;color:var(--ink);">' + (en ? '✅ يومك خلص' : '🟢 يومك شغال') + '</div><div style="color:var(--muted);margin-top:2px;">بدأ ' + t(st) + (en ? ' · خلص ' + t(en) : '') + ' · ' + dur + '</div></div>' +
+    (en ? '' : '<button onclick="repEndDay()" style="padding:9px 14px;border-radius:10px;background:#F7E9E6;color:var(--maroon);font-size:12.5px;font-weight:700;"><i class="fas fa-flag-checkered"></i> خلّصت يومي</button>') + '</div>';
+}
+// ---------- خط السير الثابت ----------
+function repPlanToday(){ var wd = planWeekdayNow(); return myRepCustomers().filter(function(c){ return Array.isArray(c.visitDays) && c.visitDays.indexOf(wd) !== -1; }); }
+function repHasPlan(){ return myRepCustomers().some(function(c){ return Array.isArray(c.visitDays) && c.visitDays.length; }); }
+// ---------- وصلت / مدة الزيارة ----------
+function repCheckin(){ try { return JSON.parse(localStorage.getItem(amKey('rep_checkin')) || 'null'); } catch (e) { return null; } }
+function repDoCheckin(){
+  var c = repTargetCustomer; if (!c) return;
+  var go = function(){
+    repQuickPos(6000).then(function(p){
+      try { localStorage.setItem(amKey('rep_checkin'), JSON.stringify({ code: String(c.code), at: Date.now(), loc: p || null })); } catch (e) {}
+      showToast('اتسجل وصولك لـ ' + (c.shopName || c.name || '') + ' ⏱');
+      renderRepCheckinBar(c);
+    });
+  };
+  if (!repDayStarted()) { if (confirm('لسه ما بدأتش يومك — نبدأه دلوقتي؟')) repStartDay(go); return; }
+  go();
+}
+function renderRepCheckinBar(c){
+  var b = document.getElementById('repCheckinBar'); if (!b || !c) return;
+  var ci = repCheckin();
+  if (ci && ci.code === String(c.code) && Date.now() - ci.at < 6 * 3600000) {
+    var m = Math.max(0, Math.round((Date.now() - ci.at) / 60000));
+    b.innerHTML = '<div style="display:flex;align-items:center;gap:8px;background:#E8F3EB;color:#2E7D42;border-radius:12px;padding:9px 12px;font-size:12.5px;font-weight:600;margin-top:12px;"><i class="fas fa-stopwatch"></i> في المحل من ' + (m < 1 ? 'أقل من دقيقة' : m + ' دقيقة') + '<span style="margin-right:auto;font-weight:500;font-size:11px;">سجّل الزيارة قبل ما تمشي</span></div>';
+  } else {
+    b.innerHTML = '<button onclick="repDoCheckin()" style="width:100%;margin-top:12px;padding:11px;border-radius:12px;background:var(--success);color:#fff;font-size:13px;font-weight:700;"><i class="fas fa-store"></i> وصلت للمحل</button>';
+  }
+}
+
 function lastVisitFor(code){
-  return repVisits.find(function(v){ return v.kind !== 'newCustomer' && v.kind !== 'locationChange' && !v.auto && String(v.customerCode) === String(code); });
+  return repVisits.find(function(v){ return !v.kind && !v.auto && String(v.customerCode) === String(code); });
 }
 var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
@@ -2129,13 +2218,14 @@ function openRepClientActions(code){
   var av = document.getElementById('repClientActionsAvatar');
   av.textContent = avatarInitial(cust.name || cust.code);
   av.style.background = avatarColor(cust.code);
-  try { renderRepNavButton(cust); renderRepCustomerInsights(cust); loadRepCustomerHistory(cust); } catch (e) { console.error(e); }
+  try { renderRepCheckinBar(cust); renderRepNavButton(cust); renderRepCustomerInsights(cust); loadRepCustomerHistory(cust); } catch (e) { console.error(e); }
   openModalOverlay('repClientActionsModal');
 }
 
 // ==================== زيارات المندوب ====================
 function openRepVisitModal(){
   if (!repTargetCustomer) return;
+  if (currentRep && currentRep.type === 'sales' && !repDayStarted()) { if (confirm('لسه ما بدأتش يومك — نبدأه دلوقتي؟')) repStartDay(openRepVisitModal); return; }
   closeModalOverlay('repClientActionsModal');
   document.getElementById('repVisitClientName').textContent = 'العميل: ' + (repTargetCustomer.name || repTargetCustomer.code);
   repVisitStatusValue = '';
@@ -2248,6 +2338,11 @@ function saveRepVisit(){
   };
   if (repVisitStatusValue === 'غير ناجحة') { visit.failReason = repFailReason; var cn = (document.getElementById('repCompetitorName') || {}).value; if (cn && repFailReason === 'بيشتري من منافس') visit.competitor = cn.trim(); }
   if (repVisitPhoto) visit.photo = repVisitPhoto;
+  var ci = repCheckin();
+  if (ci && ci.code === String(cust.code) && Date.now() - ci.at < 6 * 3600000) {
+    visit.checkInAt = new Date(ci.at).toISOString(); visit.durationMin = Math.max(0, Math.round((Date.now() - ci.at) / 60000));
+    try { localStorage.removeItem(amKey('rep_checkin')); } catch (e) {}
+  } else visit.durationMin = null;
   try {
     visit.mock = amIsMock();
     if (repPendingLocation) visit.locAcc = repPendingLocation.acc || null;
@@ -2349,7 +2444,7 @@ function renderRepProgress(){
 function renderRepVisitsList(){
   var wrap = document.getElementById('repVisitsList');
   if (!wrap) return;
-  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto && v.kind !== 'locationChange'; }).slice(0, 20);
+  var mine = repVisits.filter(function(v){ return currentRep && v.repUsername === currentRep.code && !v.auto && (!v.kind || v.kind === 'newCustomer'); }).slice(0, 20);
   // (2026-11-06) طلبات العملاء الجداد بتظهر هنا بحالتها
   if (mine.length === 0) { wrap.innerHTML = '<div class="rep-empty"><i class="fas fa-route"></i><p>لا توجد زيارات مسجلة بعد</p></div>'; return; }
   wrap.innerHTML = mine.map(function(v){
