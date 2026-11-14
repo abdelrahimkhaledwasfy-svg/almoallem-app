@@ -822,6 +822,11 @@
       <i class="fas fa-chevron-left rep-action-chev"></i>
     </button>
     <div id="repReorderSlot"></div>
+    <button class="rep-action-btn" onclick="repActivateCustomerApp()">
+      <div class="rep-action-icon" style="background:#E7EEF9;color:#2A5EA8;"><i class="fas fa-mobile-screen"></i></div>
+      <div><div class="rep-action-title">حساب العميل على الأبليكشن</div><div class="rep-action-sub">اعمله حساب أو شوف هو عنده ولا لأ</div></div>
+      <i class="fas fa-chevron-left rep-action-chev"></i>
+    </button>
     <button class="rep-action-btn" style="margin-bottom:0;" onclick="openRepVisitModal()">
       <div class="rep-action-icon" style="background:#F7E9E6;color:var(--maroon);"><i class="fas fa-clipboard-check"></i></div>
       <div><div class="rep-action-title">تسجيل زيارة</div><div class="rep-action-sub">حالة الزيارة وموقعك</div></div>
@@ -842,6 +847,7 @@
     <div class="rep-field"><label>رقم التليفون</label><input class="form-input" id="rncPhone" type="tel" dir="ltr" style="text-align:left;" maxlength="11" placeholder="01xxxxxxxxx"></div>
     <div class="rep-field"><label>الحي</label><select class="form-input" id="rncNb"></select></div>
     <div class="rep-field"><label>العنوان بالتفصيل</label><input class="form-input" id="rncAddress"></div>
+    <div class="rep-field"><label>رقم سري للعميل على الأبليكشن (6 أرقام)</label><input class="form-input" id="rncPass" type="tel" inputmode="numeric" maxlength="12" dir="ltr" style="text-align:left;" placeholder="مثلًا آخر 6 أرقام من تليفونه"><div style="font-size:10.5px;color:var(--muted);margin-top:4px;">أول ما الإدارة توافق، العميل يقدر يدخل الأبليكشن برقمه والرقم السري ده على طول</div></div>
     <div class="rep-field"><label>الموقع</label><div id="rncLocStatus" style="font-size:10.5px;color:var(--muted);"></div></div>
     <div class="rep-field"><label>صورة المحل (اختياري)</label>
       <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;background:var(--cream);color:var(--maroon);font-size:11px;font-weight:800;cursor:pointer;"><i class="fas fa-camera"></i> صوّر<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="rncPickPhoto(this)"></label>
@@ -973,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-14-1';
+  var APP_BUILD = '2026-11-14-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -2025,7 +2031,7 @@ function compressPhoto(file, maxSide, q){
 // ---------- 5) عميل جديد من الشارع ----------
 var repNewCustLoc = null, repNewCustPhoto = '';
 function openRepNewCustomer(){
-  ['rncName', 'rncShop', 'rncPhone', 'rncAddress'].forEach(function(id){ document.getElementById(id).value = ''; });
+  ['rncName', 'rncShop', 'rncPhone', 'rncAddress', 'rncPass'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
   var sel = document.getElementById('rncNb');
   sel.innerHTML = '<option value="">اختار الحي</option>' + (appNeighborhoods || []).map(function(n){ var name = typeof n === 'string' ? n : (n.name || ''); return name ? '<option>' + repEsc(name) + '</option>' : ''; }).join('');
   repNewCustLoc = null; repNewCustPhoto = '';
@@ -2041,22 +2047,48 @@ function rncPickPhoto(inp){
   var f = inp.files && inp.files[0]; if (!f) return;
   compressPhoto(f, 360, 0.5).then(function(url){ repNewCustPhoto = url; document.getElementById('rncPhotoStatus').innerHTML = '<img src="' + url + '" style="width:64px;height:64px;object-fit:cover;border-radius:10px;">'; });
 }
-function saveRepNewCustomer(){
+async function saveRepNewCustomer(){
   var name = document.getElementById('rncName').value.trim(), shop = document.getElementById('rncShop').value.trim();
   var phone = canonicalPhone(document.getElementById('rncPhone').value.trim());
+  var pass = toLatinDigits((document.getElementById('rncPass') || {}).value || '').trim();
   if (!shop && !name) { showToast('اكتب اسم المحل أو صاحبه', 'error'); return; }
   if (!/^01[0-9]{9}$/.test(phone)) { showToast('رقم التليفون لازم يكون 11 رقم ويبدأ بـ 01', 'error'); return; }
+  if (pass && (!/^[0-9]+$/.test(pass) || pass.length < 6)) { showToast('الرقم السري لازم يكون 6 أرقام على الأقل (أرقام بس)', 'error'); return; }
+  if (!pass && !confirm('مكتبتش رقم سري للعميل — هيضطر يعمل حساب بنفسه على الأبليكشن. تكمل كده؟')) return;
+  var passHash = pass ? await hashPassword(pass) : '';
   var dup = allCustomers.find(function(c){ return digitsOnly(c.phone).slice(-10) === phone.slice(-10); });
   if (dup && !confirm('الرقم ده متسجل لعميل: ' + (dup.shopName || dup.name) + '\nتبعته برضه؟')) return;
   var rec = {
     id: 'nc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), kind: 'newCustomer', status: 'pending', date: new Date().toISOString(),
     repUsername: currentRep.code, repFullName: currentRep.name || '',
-    customerCode: '', customerName: name || shop, newCustomer: { name: name || shop, shopName: shop, phone: phone, neighborhood: document.getElementById('rncNb').value, address: document.getElementById('rncAddress').value.trim(), location: repNewCustLoc || null, photo: repNewCustPhoto || '' }
+    customerCode: '', customerName: name || shop, newCustomer: { name: name || shop, shopName: shop, phone: phone, neighborhood: document.getElementById('rncNb').value, address: document.getElementById('rncAddress').value.trim(), location: repNewCustLoc || null, photo: repNewCustPhoto || '', passHash: passHash }
   };
   recordRepVisit(rec);
   closeModalOverlay('repNewCustomerModal');
-  showToast('اتبعت للإدارة ✓ — هيتضاف لعملاءك أول ما يتوافق عليه', 'success', 5000);
+  showToast('اتبعت للإدارة ✓ — هيتضاف لعملاءك أول ما يتوافق عليه' + (pass ? '، والعميل يقدر يدخل الأبليكشن برقمه والرقم السري ' + pass : ''), 'success', 7000);
   renderRepHome();
+}
+// (2026-11-14) المندوب يعمل للعميل حساب على الأبليكشن برقمه ورقم سري (لو ملوش حساب)
+async function repActivateCustomerApp(){
+  var c = repTargetCustomer; if (!c || !db) return;
+  var phone = canonicalPhone(c.phone || '');
+  if (!/^01[0-9]{9}$/.test(phone)) { showToast('العميل ده ملوش رقم موبايل صحيح في السيستم', 'error'); return; }
+  showLoading(true);
+  var acc = null; try { acc = await findAppAccount(phone); } catch (e) {}
+  showLoading(false);
+  if (acc) { alert('✅ ' + (c.shopName || c.name || '') + ' عنده حساب على الأبليكشن برقم ' + phone + '.\nلو نسي الرقم السري، يدوس "نسيت الرقم السري" في الأبليكشن أو يكلم الإدارة.'); return; }
+  var pass = prompt((c.shopName || c.name || '') + ' ملوش حساب على الأبليكشن.\nاكتب رقم سري جديد ليه (6 أرقام على الأقل) — هيدخل بيه برقم ' + phone + ':');
+  if (pass === null) return;
+  pass = toLatinDigits(pass).trim();
+  if (!/^[0-9]{6,}$/.test(pass)) { showToast('الرقم السري لازم 6 أرقام على الأقل (أرقام بس)', 'error'); return; }
+  showLoading(true);
+  try {
+    if (await findAppAccount(phone)) { showLoading(false); showToast('العميل اتعمله حساب حالًا من مكان تاني', 'error'); return; }
+    await db.collection('appCustomers').doc(phone).set({ phone: phone, passwordHash: await hashPassword(pass), createdAt: Date.now(), createdByRep: currentRep ? currentRep.code : '',
+      profile: { customerName: c.name || '', shopName: c.shopName || c.name || '', addressDetail: c.address || '', neighborhood: c.neighborhood || '', city: 'أسوان', governorate: 'أسوان', location: (c.location && c.location.lat != null) ? { lat: c.location.lat, lng: c.location.lng } : null } });
+    showLoading(false);
+    alert('✅ اتعمل الحساب.\nالعميل يدخل الأبليكشن برقم: ' + phone + '\nوالرقم السري: ' + pass);
+  } catch (e) { showLoading(false); console.error(e); showToast('تعذر عمل الحساب: ' + (e.message || ''), 'error'); }
 }
 // ---------- 8) الطلب من غير نت ----------
 function repOutbox(){ try { return JSON.parse(localStorage.getItem('am_rep_outbox') || '[]'); } catch (e) { return []; } }
