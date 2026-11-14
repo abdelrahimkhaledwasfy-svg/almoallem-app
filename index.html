@@ -973,7 +973,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-13-4';
+  var APP_BUILD = '2026-11-14-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1721,12 +1721,21 @@ function repLogout(){
 function openModalOverlay(id){ document.getElementById(id).classList.add('show'); pushModalNav(id); }
 function closeModalOverlay(id){ closeTrackedModal(id); }
 
+// (2026-11-14) لما أي بيانات توصل (العملاء / الزيارات / التارجت والمحقق) بنعيد رسم صفحة المندوب كلها
+// — قبل كده كانت بتحدّث قايمة العملاء والزيارات بس، فالأرقام والخط والتارجت يفضلوا فاضيين لحد ما المندوب يخرج ويدخل
+var _repRefreshT = null;
 function refreshRepScreensIfNeeded(){
-  if (document.getElementById('repHomeScreen') && document.getElementById('repHomeScreen').classList.contains('active')) {
-    renderRepClientResults();
-    renderRepVisitsList();
-  }
+  if (!repMode || !currentRep) return;
+  clearTimeout(_repRefreshT);
+  _repRefreshT = setTimeout(function(){
+    try {
+      var el = document.getElementById(currentRep.type === 'delivery' ? 'deliveryHomeScreen' : 'repHomeScreen');
+      if (!el || !el.classList.contains('active')) return;
+      if (currentRep.type === 'delivery') renderDeliveryHome(); else renderRepHome();
+    } catch (e) { console.error('rep refresh', e); }
+  }, 250);
 }
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) refreshRepScreensIfNeeded(); });
 
 function avatarInitial(name){
   var n = (name || '').trim();
@@ -2460,7 +2469,9 @@ function startRepVisitsListener(){
     saveRepVisitsLocal();
     flushPendingVisits();
     refreshRepScreensIfNeeded();
-  }, function(err){ console.error('rep visits listener error:', err); }); });
+  }, function(err){ console.error('rep visits listener error:', err);
+    if (!window._visRetryT) window._visRetryT = setTimeout(function(){ window._visRetryT = null; repVisitsListenerStarted = false; startRepVisitsListener(); }, 15000); }); });
+  if (window._visIntervalSet) return; window._visIntervalSet = true;
   setInterval(flushPendingVisits, 60000);
   window.addEventListener('online', flushPendingVisits);
 }
@@ -2590,7 +2601,9 @@ function startRepProgressListener(){
     repProgressDoc = snap.exists ? (snap.data() || {}) : null; window._repProgErr = '';
     try { renderRepRoute(); renderRepFollowSummary(); renderRepNav(); if (repPage.sales === 'customers') renderRepClientResults(); } catch (e) {}
     renderRepProgress();
-  }, function(err){ console.error('rep progress listener error:', err); window._repProgErr = (err && (err.code || err.message)) || 'error'; try { renderRepProgress(); } catch (e) {} }); });
+    refreshRepScreensIfNeeded();
+  }, function(err){ console.error('rep progress listener error:', err); window._repProgErr = (err && (err.code || err.message)) || 'error'; try { renderRepProgress(); } catch (e) {}
+    if (!window._progRetryT) window._progRetryT = setTimeout(function(){ window._progRetryT = null; repProgressListenerStarted = false; try { startRepProgressListener(); } catch (e) {} }, 15000); }); });
 }
 function repMonthKey(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function renderRepProgress(){
