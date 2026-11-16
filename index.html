@@ -548,7 +548,7 @@
       <div id="repFollowChips" class="rp-chips"></div>
       <div class="rep-field">
         <div class="rep-input-wrap">
-          <input type="text" id="repClientSearch" placeholder="اكتب اسم التاجر أو رقم الهاتف..." oninput="renderRepClientResults()">
+          <input type="text" id="repClientSearch" placeholder="اكتب اسم التاجر أو رقم الهاتف..." oninput="repSearchInput()">
           <i class="fas fa-magnifying-glass"></i>
         </div>
       </div>
@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-14-2';
+  var APP_BUILD = '2026-11-16-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1774,8 +1774,9 @@ function renderRepHome(){
   document.getElementById('repStatVisits').textContent = todayVisits.length;
   document.getElementById('repStatSuccess').textContent = todayVisits.filter(function(v){ return v.status === 'ناجحة'; }).length;
   document.getElementById('repStatLast').textContent = mine.length ? timeAgoAr(mine[0].date) : '-';
-  renderRepClientResults();
-  renderRepVisitsList();
+  // الصفحات التقيلة بتترسم بس لو المندوب واقف عليها (وبتترسم لما يفتحها)
+  if (repPage.sales === 'customers') renderRepClientResults();
+  if (repPage.sales === 'visits') renderRepVisitsList();
   try { renderRepDayCard(); renderRepFollowSummary(); renderRepRoute(); renderRepOutboxBadge(); renderRepNav(); if (repPage.sales === 'account') renderRepAccount(); } catch (e) { console.error(e); }
   if (!repMyPos) repRefreshPos(function(){ try { renderRepRoute(); } catch (e) {} });
   setTimeout(function(){ try { replayRepOutbox(); } catch (e) {} }, 2000);
@@ -2307,14 +2308,21 @@ function renderDeliveryReportPage(){
 // ---------- عملاء محتاجين متابعة ----------
 var FU_DEF = { opened: ['👀', 'فتحوا الأبليكشن وما طلبوش'], once: ['1️⃣', 'طلبوا مرة واحدة الشهر ده'], lapsed: ['😴', 'بطّلوا الشهر ده'] };
 var repFollowMode = '';
+var _flCache = { key: '', val: null };
 function repFollowLists(){
+  var key = [currentRep && currentRep.code, repProgressDoc && repProgressDoc.updatedAt, repVisits.length, allCustomers.length, new Date().getHours()].join('|');
+  if (_flCache.key === key && _flCache.val) return _flCache.val;
+  var res = repFollowListsRaw(); _flCache = { key: key, val: res }; return res;
+}
+function repFollowListsRaw(){
   var out = { opened: [], once: [], lapsed: [] }; if (!currentRep || repKind() !== 'sales') return out;
   var now = Date.now(), mStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  var fus = repVisits.filter(function(v){ return v.kind === 'followUp' && v.repUsername === currentRep.code; });
+  var fuLast = {};
+  repVisits.forEach(function(v){ if (v.kind !== 'followUp' || v.repUsername !== currentRep.code) return; var t = new Date(v.date).getTime(), k = String(v.customerCode); if (!fuLast[k] || t > fuLast[k]) fuLast[k] = t; });
   myRepCustomers().forEach(function(c){
     var s = repCustStats(c.code); if (!s) return;
     var l = (s.l || 0) * 1000, o = (s.o || 0) * 1000;
-    var doneAfter = function(t){ return fus.some(function(f){ return String(f.customerCode) === String(c.code) && new Date(f.date).getTime() > t; }); };
+    var doneAfter = function(t){ return (fuLast[String(c.code)] || 0) > t; };
     if (o && now - o < 3 * 86400000 && l < o && !doneAfter(o)) out.opened.push({ c: c, s: s, why: 'فتح الأبليكشن ' + timeAgoAr(new Date(o).toISOString()) + ' وما طلبش' });
     if (s.m === 1 && !doneAfter(Math.max(l, mStart))) out.once.push({ c: c, s: s, why: 'طلب مرة واحدة الشهر ده (' + new Date(l).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) + ')' });
     if ((s.pm || 0) >= 1 && !s.m && !doneAfter(mStart)) out.lapsed.push({ c: c, s: s, why: 'الشهر اللي فات طلب ' + s.pm + ' مرة · الشهر ده ولا مرة' + (l ? ' · آخر طلب ' + new Date(l).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) : '') });
@@ -2364,9 +2372,18 @@ function saveRepFollow(code, result){
   renderRepClientResults(); renderRepFollowSummary(); renderRepNav();
 }
 
+// (2026-11-16) أسرع: خريطة آخر زيارة لكل عميل بتتحسب مرة واحدة (قبل كده كانت بتدور في كل الزيارات لكل عميل في الترتيب → البحث بيعلّق)
+var _lvCache = { arr: null, len: -1, map: {} };
 function lastVisitFor(code){
-  return repVisits.find(function(v){ return !v.kind && !v.auto && String(v.customerCode) === String(code); });
+  if (_lvCache.arr !== repVisits || _lvCache.len !== repVisits.length) {
+    var m = {};
+    for (var i = 0; i < repVisits.length; i++) { var v = repVisits[i]; if (v.kind || v.auto) continue; var k = String(v.customerCode); if (!m[k] || new Date(v.date) > new Date(m[k].date)) m[k] = v; }
+    _lvCache = { arr: repVisits, len: repVisits.length, map: m };
+  }
+  return _lvCache.map[String(code)];
 }
+var _repSearchT = null;
+function repSearchInput(){ clearTimeout(_repSearchT); _repSearchT = setTimeout(function(){ repClientLimit = 40; renderRepClientResults(); }, 200); }
 var repClientLimit = 40;
 function showMoreRepClients(){ repClientLimit += 40; renderRepClientResults(); }
 
@@ -2392,8 +2409,8 @@ function renderRepClientResults(){
     });
   }
   // الترتيب: اللي ماتزارش خالص الأول، وبعدين اللي آخر زيارة ليه أقدم (عشان المندوب يعرف مين محتاج زيارة)
-  var lastTs = function(c){ var lv = lastVisitFor(c.code); return lv ? new Date(lv.date).getTime() : 0; };
-  list = list.slice().sort(function(a, b){ return (lastTs(a) - lastTs(b)) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'); });
+  var tsOf = {}; list.forEach(function(c){ var lv = lastVisitFor(c.code); tsOf[c.code] = lv ? new Date(lv.date).getTime() : 0; });
+  list = list.slice().sort(function(a, b){ return (tsOf[a.code] - tsOf[b.code]) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'); });
   var totalCount = list.length;
   list = list.slice(0, repClientLimit);
   var wrap = document.getElementById('repClientResults');
