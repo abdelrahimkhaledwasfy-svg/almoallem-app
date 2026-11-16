@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-16-1';
+  var APP_BUILD = '2026-11-16-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1865,7 +1865,10 @@ function loadRepCustomerHistory(cust){
     if (!repTargetCustomer || String(repTargetCustomer.code) !== String(cust.code)) return;
     var orders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }).filter(function(o){ return o.status !== 'rejected' && o.status !== 'returned' && o.status !== 'merged' && o.status !== 'cancelled'; })
       .sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
-    repCardHistory = { code: cust.code, orders: orders };
+    // (2026-11-16) "آخر مرة" = آخر طلب اتسلّم فعلًا. الطلب اللي لسه مفتوح (اللي المندوب عامله النهارده مثلًا) بيظهر لوحده ومش بيتكرر
+    var done = orders.filter(function(o){ return o.status === 'delivered'; });
+    var open = orders.filter(function(o){ return o.status !== 'delivered'; });
+    repCardHistory = { code: cust.code, orders: done, open: open };
     renderRepCustomerInsights(cust);
   }).catch(function(e){ console.error('customer history', e); });
 }
@@ -1873,6 +1876,7 @@ function renderRepCustomerInsights(cust){
   var box = document.getElementById('repClientInsights'); if (!box) return;
   var slot = document.getElementById('repReorderSlot');
   var orders = repCardHistory.code === cust.code ? repCardHistory.orders : [];
+  var openOrders = repCardHistory.code === cust.code ? (repCardHistory.open || []) : [];
   var s = repCustStats(cust.code) || {};
   var last = orders[0];
   var lastAt = last ? last.createdAt : (s.l ? s.l * 1000 : 0);
@@ -1886,7 +1890,9 @@ function renderRepCustomerInsights(cust){
   var dStr = lastAt ? new Date(lastAt).toLocaleDateString(repLoc(), { day: 'numeric', month: 'short' }) : '';
   var tile = function(label, val, unit, sub){ return '<div class="rep-tile"><span>' + label + '</span><b>' + val + (unit ? ' <small>' + unit + '</small>' : '') + '</b><em>' + (sub || '&nbsp;') + '</em></div>'; };
   var usualDay = (s.u != null && s.u >= 0) ? WD_AR[s.u] : '';
-  box.innerHTML = '<div class="rep-tiles">' +
+  var openHtml = openOrders.length ? '<div style="background:#FFF1DC;color:#8a5a00;border-radius:12px;padding:9px 12px;font-size:12px;margin-bottom:10px;"><i class="fas fa-clock"></i> عنده ' + (openOrders.length === 1 ? 'طلب مفتوح' : openOrders.length + ' طلبات مفتوحة') + ' لسه ما اتسلّمش بـ <b>' + money(Math.round(openOrders.reduce(function(a, o){ return a + (Number(o.total) || 0); }, 0))) + ' ج</b>' +
+    ' (' + openOrders.slice(0, 2).map(function(o){ return new Date(o.createdAt).toLocaleDateString(repLoc(), { weekday: 'short', day: 'numeric', month: 'short' }); }).join('، ') + ') — أي طلب جديد النهارده بيتضاف عليه</div>' : '';
+  box.innerHTML = openHtml + '<div class="rep-tiles">' +
       tile('آخر طلب', last ? money(Math.round(last.total)) : (lastAt ? '—' : 'مفيش'), last ? 'ج' : '', [ago, dStr].filter(Boolean).join(' · ')) +
       tile('متوسط الطلب', avg ? money(Math.round(avg)) : '—', avg ? 'ج' : '', recent.length ? 'آخر ' + recent.length + ' طلبات' : '') +
       tile('النقاط', pts, '', 'نقطة') +
