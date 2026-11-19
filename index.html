@@ -2138,7 +2138,8 @@ function replayRepOutbox(){
     if (!repTargetCustomer) {            // اتبعت
       clearInterval(iv); window._repReplaying = false; repOutboxBusy = false;
       setRepOutbox(repOutbox().filter(function(x){ return x.id !== e.id; }));
-      showToast('اتبعت طلب محفوظ ✓');
+      if (window._repReplayDropped) { window._repReplayDropped = false; cart = {}; localStorage.setItem('app_cart', '{}'); updateCartBadge(); try { switchScreenRaw('repHome'); setNavRoot('repHome', 'switchScreen'); renderRepHome(); } catch (er) {} }
+      else showToast('اتبعت طلب محفوظ ✓');
       setTimeout(replayRepOutbox, 1500);
     } else if (Date.now() - t0 > 120000) { // فشل — نرجّع كل حاجة زي ما كانت ونحاول بعدين
       clearInterval(iv); window._repReplaying = false; repOutboxBusy = false;
@@ -3593,6 +3594,36 @@ function stockCapIn(p, unit){
 function primaryClosed(p){ return !!(p.secondaryUnit && p.secondaryUnit.factor) && stockCapIn(p, 'primary') < 1 && stockCapIn(p, 'secondary') >= 1; }
 function isSellable(p){ return stockCapIn(p, 'primary') >= 1 || stockCapIn(p, 'secondary') >= 1; }
 function inStockOnly(list){ return list.filter(function(p){ return isSellable(p); }); }
+// (2026-11-19) الحد الأقصى للصنف بقى حد يومي للعميل (بالكرتونة) في يوم البيع (9 الصبح → 9 الصبح)، مش للطلب الواحد.
+// بيتجمع كل اللي العميل طلبه من الصنف النهارده (بنفسه أو عن طريق مندوب)، والمرفوض والمرتجع مبيتحسبش.
+var DAILY_LIMIT_EXCLUDED = ['rejected', 'returned', 'merged'];
+function itemCartonsFor(p, it){
+  var q = Number(it.qty) || 0;
+  var f = p.secondaryUnit && p.secondaryUnit.factor ? Number(p.secondaryUnit.factor) : 0;
+  if (f && p.secondaryUnit.name && it.unit === p.secondaryUnit.name && it.unit !== p.unit) return q / f;
+  return q;
+}
+function orderedTodayCartonsFrom(orders, p){
+  var today = salesDayStartMs(Date.now());
+  return (orders || []).reduce(function(sum, o){
+    if (!o || DAILY_LIMIT_EXCLUDED.indexOf(o.status) !== -1 || salesDayStartMs(o.createdAt) !== today) return sum;
+    return sum + (o.items || []).reduce(function(s, it){ return it.productCode === p.code ? s + itemCartonsFor(p, it) : s; }, 0);
+  }, 0);
+}
+function dailyLimitOrders(){ return (repMode && repTargetCustomer) ? (repTargetPastOrders || []) : (myOrders || []); }
+function hasDailyLimit(p){ return Number(p.maxOrderQty) > 0; }
+// المتبقي بالكرتونة للعميل النهارده (أو null لو الصنف ملوش حد)
+function dailyRemainingCartons(p){
+  if (!hasDailyLimit(p)) return null;
+  return Math.max(0, Number(p.maxOrderQty) - orderedTodayCartonsFrom(dailyLimitOrders(), p));
+}
+// أقصى كمية مسموحة في السلة بالوحدة المختارة
+function maxQtyInUnit(p, unit){
+  var f = p.secondaryUnit && p.secondaryUnit.factor ? Number(p.secondaryUnit.factor) : 1;
+  var rem = dailyRemainingCartons(p);
+  if (rem === null) return unit === 'secondary' ? 99 * f : 99;
+  return unit === 'secondary' ? Math.floor(rem * f + 1e-6) : Math.floor(rem + 1e-6);
+}
 // بيظبط السلة على المتاح (لو الكرتونة اتقفلت بيحوّلها علب) — بيرجع true لو حاجة اتغيرت
 function sanitizeCart(){
   var changed = false;
@@ -3601,7 +3632,7 @@ function sanitizeCart(){
     if (!p || !e) return;
     var unit = e.unit === 'secondary' && p.secondaryUnit ? 'secondary' : 'primary', qty = Math.floor(Number(e.qty) || 0);
     if (unit === 'primary' && primaryClosed(p)) { unit = 'secondary'; qty = qty * (Number(p.secondaryUnit.factor) || 1); }
-    qty = Math.min(qty, stockCapIn(p, unit));
+    qty = Math.min(qty, stockCapIn(p, unit), maxQtyInUnit(p, unit));
     if (qty <= 0) { delete cart[code]; changed = true; return; }
     if (qty !== e.qty || unit !== e.unit) { cart[code] = { unit: unit, qty: qty }; changed = true; }
   });
@@ -4060,8 +4091,9 @@ function psSetUnit(u){
 }
 function psStep(d){
   var p = products.find(function(x){ return x.code === psCode; }); if (!p) return;
-  var cap = stockCapIn(p, psUnit), max = psUnit === 'secondary' ? (p.maxOrderQty || 99) * (p.secondaryUnit ? p.secondaryUnit.factor || 1 : 1) : (p.maxOrderQty || 99);
-  psQty = Math.max(1, Math.min(psQty + d, cap, max));
+  var cap = stockCapIn(p, psUnit), max = maxQtyInUnit(p, psUnit);
+  if (d > 0 && psQty + d > max && max <= cap) showToast(dailyLimitMsg(p, psUnit, max));
+  psQty = Math.max(1, Math.min(psQty + d, cap, Math.max(1, max)));
   renderProductSheet();
 }
 function psAddToCart(){
@@ -4110,7 +4142,11 @@ function renderProductSheet(){
       (guest ? '<div class="ps-price" style="font-size:13px;color:var(--muted);">سجّل دخول عشان تشوف السعر</div>'
         : '<div class="ps-price">' + (offer ? '<span class="ps-old">' + money(offer.oldPrice) + '</span>' : '') + money(price) + ' <span class="ps-cur">ج.م / ' + psEsc(unitName) + '</span></div>') +
       (sec ? '<div class="ps-info"><i class="fas fa-box"></i> ال' + psEsc(p.unit) + ' = ' + (Number(sec.factor) || '') + ' ' + psEsc(sec.name) + (guest ? '' : ' · سعر ال' + psEsc(sec.name) + ' ' + money(sec.price) + ' ج.م') + '</div>' : '') +
-      '<div style="margin:10px 0 2px;">' + stockHtml + '</div>' +
+      '<div style="margin:10px 0 2px;">' + stockHtml + (function(){
+        if (oos || guest || !hasDailyLimit(p)) return '';
+        var rem = dailyRemainingCartons(p), rr = Math.round(rem * 100) / 100;
+        return ' <span class="ps-chip ' + (rem <= 0 ? 'bad' : 'warn') + '">' + (rem <= 0 ? 'وصلت للحد اليومي — متاح تاني بكرة' : ('الحد اليومي ' + p.maxOrderQty + ' ' + psEsc(p.unit) + (rr < Number(p.maxOrderQty) ? ' · المتبقي لك ' + rr : ''))) + '</span>';
+      })() + '</div>' +
       (sec && !oos ? '<div class="ps-units">' +
         '<button class="' + (psUnit !== 'secondary' ? 'on' : '') + '" ' + (closed ? 'disabled' : '') + ' onclick="psSetUnit(&#39;primary&#39;)">' + psEsc(p.unit) + (closed ? ' (خلصت)' : '') + '</button>' +
         '<button class="' + (psUnit === 'secondary' ? 'on' : '') + '" onclick="psSetUnit(&#39;secondary&#39;)">' + psEsc(sec.name) + '</button></div>' : '') +
@@ -4170,6 +4206,11 @@ function productCardHtml(p){
       '<div class="pcard-name" onclick="openProductSheet(&#39;' + p.code + '&#39;)">' + p.name + '</div>' + unitsHtml + '</div></div>';
 }
 
+function dailyLimitMsg(p, unit, maxUnit){
+  var un = unit === 'secondary' && p.secondaryUnit ? p.secondaryUnit.name : p.unit;
+  if (maxUnit <= 0) return 'وصلت للحد الأقصى اليومي من الصنف ده (' + p.maxOrderQty + ' ' + p.unit + ') — تقدر تطلبه تاني بكرة';
+  return 'الحد الأقصى اليومي من الصنف ده ' + p.maxOrderQty + ' ' + p.unit + ' — المتبقي لك النهارده ' + maxUnit + ' ' + un;
+}
 function addToCart(code, unit, qty){
   if (isGuest && !repMode) { promptGuestLogin(); return; }
   var p = products.find(function(x){return x.code === code;});
@@ -4182,10 +4223,15 @@ function addToCart(code, unit, qty){
     qty = Math.max(1, curSec || 1);
     showToast('المتاح أقل من ' + p.unit + ' — اطلب بال' + p.secondaryUnit.name + ' (متاح ' + stockCapIn(p, 'secondary') + ' ' + p.secondaryUnit.name + ')');
   }
-  var maxUnit = unit === 'secondary' ? (p.maxOrderQty || 99) * (p.secondaryUnit ? p.secondaryUnit.factor || 1 : 1) : (p.maxOrderQty || 99);
+  var maxUnit = maxQtyInUnit(p, unit);
   // الحد الأقصى المسموح بيه من نفس الوحدة دي حسب المتاح فعليًا بالمخزن (أرقام صحيحة بس)
   var stockCapInUnit = stockCapIn(p, unit);
   var requestedQty = qty;
+  if (qty > maxUnit && hasDailyLimit(p) && maxUnit < stockCapInUnit) {
+    var curQ = cart[code] ? cart[code].qty : 0;
+    showToast(dailyLimitMsg(p, unit, maxUnit), maxUnit <= 0 ? 'error' : undefined);
+    if (maxUnit <= 0 && curQ <= 0) return;
+  }
   qty = Math.max(0, Math.min(qty, maxUnit));
   if (qty > stockCapInUnit) {
     qty = stockCapInUnit;
@@ -4525,8 +4571,53 @@ function findOpenSameDayOrder(code){
   });
 }
 
+function enforceDailyLimitsFresh(){
+  var targetCode = (repMode && repTargetCustomer) ? repTargetCustomer.code : customerPhone;
+  var limited = Object.keys(cart || {}).some(function(code){ var p = products.find(function(x){ return x.code === code; }); return p && hasDailyLimit(p); });
+  if (!limited || !db || !targetCode) return Promise.resolve(true);
+  showLoading(true);
+  return db.collection('customerOrders').where('customerCode', '==', targetCode).get().then(function(snap){
+    var fresh = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    if (repMode && repTargetCustomer) repTargetPastOrders = fresh;
+    var trimmed = [];
+    Object.keys(cart).forEach(function(code){
+      var p = products.find(function(x){ return x.code === code; }), e = cart[code];
+      if (!p || !e || !hasDailyLimit(p)) return;
+      var rem = Math.max(0, Number(p.maxOrderQty) - orderedTodayCartonsFrom(fresh, p));
+      var f = p.secondaryUnit && p.secondaryUnit.factor ? Number(p.secondaryUnit.factor) : 1;
+      var maxQ = e.unit === 'secondary' ? Math.floor(rem * f + 1e-6) : Math.floor(rem + 1e-6);
+      if (e.qty > maxQ) { trimmed.push(p.name); if (maxQ <= 0) delete cart[code]; else cart[code] = { unit: e.unit, qty: maxQ }; }
+    });
+    if (!trimmed.length) return true;
+    localStorage.setItem('app_cart', JSON.stringify(cart)); scheduleCartSync(); updateCartBadge();
+    var msg = 'الحد الأقصى اليومي: اتظبطت كمية ' + trimmed.join('، ');
+    if (window._repReplaying) {
+      if (!Object.keys(cart).length) { showLoading(false); window._repReplayDropped = true; repTargetCustomer = null; showToast(msg + ' — والطلب المحفوظ اتلغى', 'error', 6000); return false; }
+      showToast(msg, undefined, 5000); return true;
+    }
+    showLoading(false);
+    showToast(msg + ' — راجع السلة وابعت تاني', 'error', 5000);
+    switchScreen('cart');
+    return false;
+  }).catch(function(err){
+    console.error('daily limit check failed:', err);
+    showLoading(false);
+    showToast('تعذر الاتصال، حاول تاني بعد لحظات', 'error');
+    return false;
+  });
+}
+
 function sendOrderToServer(){
   if (repMode && repTargetCustomer && !navigator.onLine && !window._repReplaying) { queueRepOrderOffline(); return; }
+  // (2026-11-19) قبل الإرسال بنراجع الحد اليومي على طلبات العميل من السحابة مباشرة (مش النسخة اللي على الموبايل)
+  if (!window._dailyLimitChecked) {
+    enforceDailyLimitsFresh().then(function(ok){
+      if (!ok) return;
+      window._dailyLimitChecked = true;
+      try { sendOrderToServer(); } finally { window._dailyLimitChecked = false; }
+    });
+    return;
+  }
   if (sanitizeCart()) { showToast('فيه أصناف اتظبطت على المتاح في المخزن — راجع السلة وابعت تاني', 'error'); switchScreen('cart'); return; }
   var lines = getCartLineItems();
   if (lines.length === 0) return;
