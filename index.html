@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-20-4';
+  var APP_BUILD = '2026-11-20-5';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1086,6 +1086,7 @@ function startNotifInbox(){
   notifMyInboxKeys().forEach(function(k){
     var unsub = db.collection('appMeta').doc(k).onSnapshot(function(snap){
       notifInboxParts[k] = (snap.exists && snap.data().items) || [];
+      if (k.indexOf('inbox_0') === 0 && !repMode) { window._pushOff = (snap.exists && Number(snap.data().pushOff)) || 0; try { renderPushOffBanner(); } catch (e) {} }
       var all = [];
       Object.keys(notifInboxParts).forEach(function(x){ all = all.concat(notifInboxParts[x]); });
       notifInboxItems = all.sort(function(a, b){ return (b.at || 0) - (a.at || 0); }).slice(0, 60);
@@ -1096,6 +1097,31 @@ function startNotifInbox(){
     notifInboxUnsubs.push(unsub);
   });
 }
+// (2026-11-20) لو الإشعارات مش بتوصل للعميل (قافلها أو الأبليكشن مش مسجل)، بيظهرله زرار يفعّلها
+function renderPushOffBanner(){
+  var home = document.getElementById('homeScreen'); if (!home) return;
+  var b = document.getElementById('pushOffBanner');
+  var dismissed = 0; try { dismissed = Number(localStorage.getItem('pushoff_dismiss') || 0); } catch (e) {}
+  var show = !repMode && customerPhone && !isGuest && window._pushOff && Date.now() - window._pushOff < 30 * 86400000 && Date.now() - dismissed > 3 * 86400000;
+  if (!show) { if (b) b.remove(); return; }
+  if (!b) {
+    b = document.createElement('div'); b.id = 'pushOffBanner';
+    b.style.cssText = 'margin:12px 16px 0;padding:12px 14px;border-radius:14px;background:#FFF4D6;border:1px solid #F0C75E;display:flex;gap:10px;align-items:center;font-size:12.5px;line-height:1.7;color:#5a4300;';
+    b.innerHTML = '<div style="font-size:22px;">🔔</div><div style="flex:1;"><b>الإشعارات مقفولة عندك</b><br>فعّلها عشان توصلك العروض وحالة طلبك أول بأول</div>' +
+      '<button onclick="enablePushFromBanner()" style="background:#7a1f2b;color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:700;font-family:inherit;">فعّل</button>' +
+      '<button onclick="dismissPushOffBanner()" aria-label="إغلاق" style="background:none;border:0;color:#8a6d1d;font-size:18px;padding:0 4px;">×</button>';
+    var wc = home.querySelector('.welcome-card'); if (wc && wc.nextSibling) home.insertBefore(b, wc.nextSibling); else home.insertBefore(b, home.firstChild);
+  }
+}
+function enablePushFromBanner(){
+  // أندرويد: بيطلب الإذن تاني، ولو العميل كان رافضه قبل كده بيفتحله صفحة الإعدادات يفعّله منها
+  if (window.AlmoallemAndroid) { try { AlmoallemAndroid.login(String(customerPhone)); } catch (e) { console.error(e); } }
+  else { try { window.OneSignalDeferred.push(function(OneSignal){ OneSignal.Notifications.requestPermission().catch(function(){}); }); } catch (e) {} }
+  showToast('لو ظهرلك طلب إذن، اختار "سماح" ✓');
+  try { localStorage.setItem('pushoff_dismiss', String(Date.now() - 3 * 86400000 + 3600000)); } catch (e) {}   // يختفي ساعة، ولو لسه مقفولة يرجع
+  var b = document.getElementById('pushOffBanner'); if (b) b.remove();
+}
+function dismissPushOffBanner(){ try { localStorage.setItem('pushoff_dismiss', String(Date.now())); } catch (e) {} var b = document.getElementById('pushOffBanner'); if (b) b.remove(); }
 function updateNotifBadges(){
   var seenAt = Number(localStorage.getItem(notifSeenKey()) || 0);
   var n = notifInboxItems.filter(function(x){ return (x.at || 0) > seenAt; }).length;

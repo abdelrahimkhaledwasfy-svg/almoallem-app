@@ -15,10 +15,11 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assert'); }
     p.on('pageerror', e => p.__errs.push(e.message));
     await p.route('**/*', r => { const u = r.request().url(); if (u.startsWith('https://x.test/')) { p.__loads++; return r.fulfill({ body: fs.readFileSync(FILE, 'utf8'), contentType: 'text/html' }); } return r.abort(); });
     await p.addInitScript((mode) => {
-      if (mode !== 'customer') { localStorage.setItem('app_rep_mode', '1'); localStorage.setItem('app_current_rep', JSON.stringify({ code: 'R1', name: 'مندوب', type: mode })); }
+      if (mode === 'customerIn') { localStorage.setItem('app_customer_phone', '01012345678'); }
+      else if (mode !== 'customer') { localStorage.setItem('app_rep_mode', '1'); localStorage.setItem('app_current_rep', JSON.stringify({ code: 'R1', name: 'مندوب', type: mode })); }
       window.__subs = [];
       const q = (name) => { const o = { where: () => o, orderBy: () => o, limit: () => o, doc: () => o, collection: (n) => q(n),
-        onSnapshot() { window.__subs.push(name); return () => {}; }, get: () => new Promise(() => {}), set: () => Promise.resolve(), update: () => Promise.resolve() }; return o; };
+        onSnapshot(cb) { window.__subs.push(name); if (name === 'appMeta' && typeof cb === 'function' && window.__pushOff) setTimeout(() => cb({ exists: true, data: () => ({ items: [], pushOff: window.__pushOff }) }), 300); return () => {}; }, get: () => new Promise(() => {}), set: () => Promise.resolve(), update: () => Promise.resolve() }; return o; };
       const fsdb = { collection: q, batch: () => ({ set() {}, commit: () => Promise.resolve() }), runTransaction: () => new Promise(() => {}) };
       const f = () => fsdb; f.FieldValue = { serverTimestamp: () => 0, increment: () => 0, arrayUnion: () => 0 };
       window.firebase = { initializeApp() {}, firestore: f, auth: () => ({ onAuthStateChanged(cb) { cb(null); return () => {}; }, currentUser: null, signOut: () => Promise.resolve() }), messaging: () => ({}) };
@@ -29,6 +30,18 @@ function assert(c, msg) { if (!c) throw new Error(msg || 'assert'); }
   }
   const subs = p => p.evaluate(() => [...new Set(window.__subs)]);
 
+  const ci = await open('customerIn');
+  await test('عميل قافل الإشعارات: بيظهرله زرار "فعّل"', async () => {
+    await ci.evaluate(() => { window.__pushOff = Date.now(); notifInboxStarted = false; startNotifInbox(); }); await ci.waitForTimeout(800);
+    const t = await ci.evaluate(() => { const b = document.getElementById('pushOffBanner'); return b ? b.innerText : ''; });
+    assert(/الإشعارات مقفولة/.test(t), 'الزرار مش ظاهر');
+    await ci.screenshot({ path: path.join(__dirname, 'pushoff.png') });
+  });
+  await test('عميل الإشعارات شغالة عنده: مفيش زرار', async () => {
+    await ci.evaluate(() => { window._pushOff = 0; renderPushOffBanner(); });
+    assert(!(await ci.evaluate(() => !!document.getElementById('pushOffBanner'))), 'الزرار ظاهر');
+  });
+  await test('أبليكيشن العميل (داخل) بيفتح من غير أخطاء', async () => { assert(!ci.__errs.length, ci.__errs.join(' | ')); });
   const c = await open('customer');
   await test('أبليكيشن العميل بيفتح من غير أخطاء', async () => { assert(!c.__errs.length, c.__errs.join(' | ')); });
 
