@@ -527,7 +527,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب</div>
           <div class="welcome-name" id="repWelcomeName">-</div>
         </div>
-        <button class="notif-bell-btn" onclick="repManualRefresh()" aria-label="تحديث" style="margin-inline-end:6px;"><i class="fas fa-rotate-right"></i></button><button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
+        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="repStatVisits">0</b><span>زيارات النهاردة</span></div>
@@ -582,7 +582,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب تسليم</div>
           <div class="welcome-name" id="deliveryWelcomeName">-</div>
         </div>
-        <button class="notif-bell-btn" onclick="repManualRefresh()" aria-label="تحديث" style="margin-inline-end:6px;"><i class="fas fa-rotate-right"></i></button><button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
+        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="deliveryStatPending">0</b><span>بانتظار التسليم</span></div>
@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-20-1';
+  var APP_BUILD = '2026-11-20-2';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1766,6 +1766,42 @@ function repManualRefresh(){
   if (repTargetCustomer) { showToast('خلّص الطلبية الأول أو الغيها، وبعدين حدّث'); return; }
   showToast('بيتحدث...'); repHardRefresh();
 }
+// (2026-11-20) اسحب الشاشة لتحت وانت في أولها → تحديث (زي أي أبليكشن)
+(function(){
+  var y0 = null, x0 = 0, dy = 0, el = null, TH = 85;
+  function ind(){
+    if (el) return el;
+    el = document.createElement('div');
+    el.style.cssText = 'position:fixed;top:0;left:50%;width:42px;height:42px;margin-left:-21px;border-radius:50%;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;z-index:99999;color:#7a1f2b;font-size:18px;transform:translateY(-60px);opacity:0;pointer-events:none;';
+    el.innerHTML = '<i class="fas fa-arrow-rotate-right"></i>';
+    document.body.appendChild(el); return el;
+  }
+  function show(d){ var e = ind(), p = Math.min(d / TH, 1); e.style.transition = 'none'; e.style.opacity = String(p); e.style.transform = 'translateY(' + (Math.min(d, 130) * 0.6 + 10 + (window.__safeTop || 0)) + 'px) rotate(' + (p * 300) + 'deg)'; e.style.color = p >= 1 ? '#0F6E56' : '#7a1f2b'; }
+  function hide(){ if (!el) return; el.style.transition = 'transform .25s, opacity .25s'; el.style.transform = 'translateY(-60px)'; el.style.opacity = '0'; }
+  function innerScrolled(t){ for (var n = t; n && n !== document.body; n = n.parentElement) { if (n.scrollTop > 0) return true; } return false; }
+  document.addEventListener('touchstart', function(e){
+    y0 = null; dy = 0;
+    if (!repMode || !currentRep || e.touches.length !== 1) return;
+    if ((window.scrollY || document.documentElement.scrollTop || 0) > 2) return;
+    if (document.querySelector('.modal-overlay.show') || innerScrolled(e.target)) return;
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX;
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e){
+    if (y0 == null) return;
+    var d = e.touches[0].clientY - y0, dx = Math.abs(e.touches[0].clientX - x0);
+    if (d <= 0 || dx > d) { if (dy) hide(); dy = 0; if (d < -5 || dx > 30) y0 = null; return; }
+    if ((window.scrollY || 0) > 2) { y0 = null; hide(); return; }
+    dy = d; show(d);
+  }, { passive: true });
+  document.addEventListener('touchend', function(){
+    if (y0 == null) return; y0 = null;
+    if (dy >= TH) {
+      if (repTargetCustomer) { hide(); showToast('خلّص الطلبية الأول أو الغيها، وبعدين حدّث'); }
+      else { var e = ind(); e.style.transition = 'transform 1s linear'; e.style.transform = e.style.transform.replace(/rotate\([^)]*\)/, 'rotate(1080deg)'); repHardRefresh(); }
+    } else hide();
+    dy = 0;
+  }, { passive: true });
+})();
 function repDataLooksStale(){
   if (currentRep && currentRep.type === 'sales' && repProgressDoc && repProgressDoc.updatedAt && Date.now() - repProgressDoc.updatedAt > 40 * 60000) return true;
   return false;
