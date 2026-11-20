@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-20-3';
+  var APP_BUILD = '2026-11-20-4';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1803,19 +1803,23 @@ function repManualRefresh(){
   }, { passive: true });
 })();
 function repDataLooksStale(){
-  if (currentRep && currentRep.type === 'sales' && repProgressDoc && repProgressDoc.updatedAt && Date.now() - repProgressDoc.updatedAt > 40 * 60000) return true;
-  return false;
+  // التارجت والمحقق بييجوا من السيستم كل 10 دقايق (طول ما فيه جهاز إدارة فاتح). لو قدام أكتر من 40 دقيقة
+  // بنعمل تحديث مرة واحدة بس لنفس النسخة — عشان لو السيستم نفسه مقفول (بالليل مثلاً) منفضلش نحدّث على الفاضي
+  if (!(currentRep && currentRep.type === 'sales' && repProgressDoc && repProgressDoc.updatedAt)) return false;
+  if (Date.now() - repProgressDoc.updatedAt <= 40 * 60000) return false;
+  var k = String(repProgressDoc.updatedAt); try { if (sessionStorage.getItem('rep_stale_tried') === k) return false; sessionStorage.setItem('rep_stale_tried', k); } catch (e) { return false; }
+  return true;
 }
+// بعد إصلاح بدء المتابعات، الاتصال بيفضل شغال لوحده؛ التحديث الكامل بقى للحالات الطويلة بس (كل تحديث كامل بيعيد تحميل كل البيانات وده بيتحسب على فاتورة Firebase)
 document.addEventListener('visibilitychange', function(){
   if (document.hidden) { _repHiddenAt = Date.now(); return; }
   var away = _repHiddenAt ? Date.now() - _repHiddenAt : 0; _repHiddenAt = 0;
-  if (away >= 5 * 60000 && repSafeToReload()) repHardRefresh();             // رجع للأبليكشن بعد 5 دقايق أو أكتر
+  if (away >= 30 * 60000 && repSafeToReload()) repHardRefresh();            // رجع للأبليكشن بعد نص ساعة أو أكتر
 });
 setInterval(function(){
   if (document.hidden || !repSafeToReload()) return;
-  var idle = Date.now() - _repLastTouch, age = Date.now() - _repOpenedAt;
-  if (idle < 90000) return;                                                // المندوب بيستخدم الأبليكشن دلوقتي — منقاطعوش
-  if (age >= 45 * 60000 || (age >= 5 * 60000 && repDataLooksStale())) repHardRefresh();   // كل 45 دقيقة وهو فاضي، أو بدري لو البيانات قديمة
+  if (Date.now() - _repLastTouch < 90000) return;                          // المندوب بيستخدم الأبليكشن دلوقتي — منقاطعوش
+  if (Date.now() - _repOpenedAt >= 5 * 60000 && repDataLooksStale()) repHardRefresh();
 }, 60000);
 
 function avatarInitial(name){
@@ -2695,11 +2699,11 @@ var repMyOrders = [], repOrdersListenerStarted = false;
 function startRepOrdersListener(){
   if (!db || repOrdersListenerStarted || !currentRep || currentRep.type !== 'sales') return;
   repOrdersListenerStarted = true;
-  db.collection('customerOrders').where('repCode', '==', currentRep.code).onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('customerOrders').where('repCode', '==', currentRep.code).onSnapshot(function(snap){
     repMyOrders = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
       .sort(function(a, b){ return getTimeValue(b.createdAt) - getTimeValue(a.createdAt); });
     if (document.getElementById('repHomeScreen') && document.getElementById('repHomeScreen').classList.contains('active')) renderRepOrdersList();
-  }, function(err){ console.error('rep orders listener error:', err); });
+  }, function(err){ console.error('rep orders listener error:', err); if (!window._rt_startRepOrdersListener) window._rt_startRepOrdersListener = setTimeout(function(){ window._rt_startRepOrdersListener = null; repOrdersListenerStarted = false; try { startRepOrdersListener(); } catch (e) {} }, 15000); }); });
 }
 var repOrdersShowAll = false;
 function toggleRepOrdersAll(){ repOrdersShowAll = !repOrdersShowAll; renderRepOrdersList(); }
@@ -2847,11 +2851,11 @@ let deliveryListenerStarted = false;
 function startDeliveryInvoicesListener(){
   if (!db || deliveryListenerStarted) return;
   deliveryListenerStarted = true;
-  db.collection('customerOrders').where('status', '==', 'ready').onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('customerOrders').where('status', '==', 'ready').onSnapshot(function(snap){
     deliveryInvoices = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
     deliveryInvoices.sort(function(a, b){ return ((a.repDelivery ? 1 : 0) - (b.repDelivery ? 1 : 0)) || ((a.createdAt || 0) - (b.createdAt || 0)); });
     renderDeliveryHome();
-  }, function(err){ console.error('Delivery orders listener error:', err); });
+  }, function(err){ console.error('Delivery orders listener error:', err); if (!window._rt_startDeliveryInvoicesListener) window._rt_startDeliveryInvoicesListener = setTimeout(function(){ window._rt_startDeliveryInvoicesListener = null; deliveryListenerStarted = false; try { startDeliveryInvoicesListener(); } catch (e) {} }, 15000); }); });
 }
 
 let deliveryHistoryInvoices = [];   // سجلات التحصيل (العهدة) بتاعة المندوب ده
@@ -2862,7 +2866,7 @@ function startDeliveryHistoryListener(){
   whenRepAuthReady().then(function(){ db.collection('deliveryCollectionRecords').where('repUsername', '==', currentRep.code).onSnapshot(function(snap){
     deliveryHistoryInvoices = snap.docs.map(function(d){ return d.data(); });
     renderDeliveryHome();
-  }, function(err){ console.error('Delivery history listener error:', err); }); });
+  }, function(err){ console.error('Delivery history listener error:', err); if (!window._rt_startDeliveryHistoryListener) window._rt_startDeliveryHistoryListener = setTimeout(function(){ window._rt_startDeliveryHistoryListener = null; deliveryHistoryListenerStarted = false; try { startDeliveryHistoryListener(); } catch (e) {} }, 15000); }); });
 }
 
 // (2026-10-08) المبلغ المطلوب بيتحسب من أصناف الطلب نفسها (نفس طريقة نظام المعلم وقت عمل الفاتورة)
@@ -2896,7 +2900,7 @@ function startRepShortageListener(){
     var b = d.initializedAt && d.balances ? d.balances[String(currentRep.code)] : null;
     myShortageBalance = b && b.balance != null ? (Number(b.balance) || 0) : null;
     renderDeliveryHome();
-  }, function(err){ console.error('rep shortage listener error:', err); }); });
+  }, function(err){ console.error('rep shortage listener error:', err); if (!window._rt_startRepShortageListener) window._rt_startRepShortageListener = setTimeout(function(){ window._rt_startRepShortageListener = null; repShortageListenerStarted = false; try { startRepShortageListener(); } catch (e) {} }, 15000); }); });
 }
 function myShortageHtml(){
   if (myShortageBalance == null || Math.abs(myShortageBalance) < 0.005) return '';
@@ -3057,10 +3061,10 @@ var repReturnsListenerStarted = false;
 function startRepReturnsListener(){
   if (!db || repReturnsListenerStarted || !currentRep) return;
   repReturnsListenerStarted = true;
-  db.collection('customerOrders').where('repReturnRepCode', '==', currentRep.code).onSnapshot(function(snap){
+  whenRepAuthReady().then(function(){ db.collection('customerOrders').where('repReturnRepCode', '==', currentRep.code).onSnapshot(function(snap){
     myRepReturns = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
     renderDeliveryHome();
-  }, function(err){ console.error('rep returns listener error:', err); });
+  }, function(err){ console.error('rep returns listener error:', err); if (!window._rt_startRepReturnsListener) window._rt_startRepReturnsListener = setTimeout(function(){ window._rt_startRepReturnsListener = null; repReturnsListenerStarted = false; try { startRepReturnsListener(); } catch (e) {} }, 15000); }); });
 }
 function openDeliveryInvoice(orderId){
   var o = deliveryInvoices.find(function(x){ return x.id === orderId; });
