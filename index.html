@@ -527,7 +527,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب</div>
           <div class="welcome-name" id="repWelcomeName">-</div>
         </div>
-        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
+        <button class="notif-bell-btn" onclick="repManualRefresh()" aria-label="تحديث" style="margin-inline-end:6px;"><i class="fas fa-rotate-right"></i></button><button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="repStatVisits">0</b><span>زيارات النهاردة</span></div>
@@ -582,7 +582,7 @@
           <div class="welcome-sub">أهلاً بيك يا مندوب تسليم</div>
           <div class="welcome-name" id="deliveryWelcomeName">-</div>
         </div>
-        <button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
+        <button class="notif-bell-btn" onclick="repManualRefresh()" aria-label="تحديث" style="margin-inline-end:6px;"><i class="fas fa-rotate-right"></i></button><button class="notif-bell-btn" onclick="openNotifInbox()" aria-label="الإشعارات"><i class="fas fa-bell"></i><span class="notif-bell-badge"></span></button>
       </div>
       <div class="rep-stats-row">
         <div class="rep-stat"><b id="deliveryStatPending">0</b><span>بانتظار التسليم</span></div>
@@ -979,7 +979,7 @@
 <script>
   // ==================== الأبليكشن بيتأكد إنه شغال بآخر نسخة ====================
   // لو الموبايل فاتح نسخة قديمة محفوظة، بنمسح المحفوظ ونفتح الجديدة مرة واحدة لوحدنا.
-  var APP_BUILD = '2026-11-16-2';
+  var APP_BUILD = '2026-11-20-1';
   (function(){
     function check(){
       if (!navigator.onLine || sessionStorage.getItem('app_update_reloaded') === APP_BUILD) return;
@@ -1742,6 +1742,45 @@ function refreshRepScreensIfNeeded(){
   }, 250);
 }
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) refreshRepScreensIfNeeded(); });
+
+// (2026-11-20) الأبليكشن لو فضل مفتوح فترة طويلة (أو الموبايل نام) الاتصال بالسحابة ممكن يقف من غير ما يبان،
+// فالأرقام والخط والقوايم تفضل قديمة لحد ما المندوب يخرج ويدخل. دلوقتي الأبليكشن بيعمل "تحديث كامل" لوحده
+// (نفس اللي بيحصل لما يخرج ويدخل، من غير ما يطلب كلمة سر) — بس وهو فاضي: مفيش طلبية شغالة ولا شاشة مفتوحة ولا كتابة.
+var _repHiddenAt = 0, _repLastTouch = Date.now(), _repOpenedAt = Date.now();
+['touchstart', 'keydown', 'mousedown', 'scroll'].forEach(function(ev){ document.addEventListener(ev, function(){ _repLastTouch = Date.now(); }, { passive: true, capture: true }); });
+function repSafeToReload(){
+  if (!repMode || !currentRep) return false;
+  if (!navigator.onLine) return false;
+  if (repTargetCustomer) return false;                                    // طلبية شغالة لعميل
+  if (document.querySelector('.modal-overlay.show')) return false;         // شاشة مفتوحة (زيارة، عميل جديد، تسليم...)
+  var a = document.activeElement; if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return false;
+  if (window._loginInProgress) return false;
+  return true;
+}
+function repHardRefresh(){
+  try { sessionStorage.setItem('rep_auto_refresh_at', String(Date.now())); } catch (e) {}
+  try { if (typeof flushPendingVisits === 'function') flushPendingVisits(); } catch (e) {}
+  setTimeout(function(){ location.reload(); }, 400);
+}
+function repManualRefresh(){
+  if (repTargetCustomer) { showToast('خلّص الطلبية الأول أو الغيها، وبعدين حدّث'); return; }
+  showToast('بيتحدث...'); repHardRefresh();
+}
+function repDataLooksStale(){
+  if (currentRep && currentRep.type === 'sales' && repProgressDoc && repProgressDoc.updatedAt && Date.now() - repProgressDoc.updatedAt > 40 * 60000) return true;
+  return false;
+}
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden) { _repHiddenAt = Date.now(); return; }
+  var away = _repHiddenAt ? Date.now() - _repHiddenAt : 0; _repHiddenAt = 0;
+  if (away >= 5 * 60000 && repSafeToReload()) repHardRefresh();             // رجع للأبليكشن بعد 5 دقايق أو أكتر
+});
+setInterval(function(){
+  if (document.hidden || !repSafeToReload()) return;
+  var idle = Date.now() - _repLastTouch, age = Date.now() - _repOpenedAt;
+  if (idle < 90000) return;                                                // المندوب بيستخدم الأبليكشن دلوقتي — منقاطعوش
+  if (age >= 45 * 60000 || (age >= 5 * 60000 && repDataLooksStale())) repHardRefresh();   // كل 45 دقيقة وهو فاضي، أو بدري لو البيانات قديمة
+}, 60000);
 
 function avatarInitial(name){
   var n = (name || '').trim();
